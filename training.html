@@ -79,6 +79,44 @@ td.n,th.n{text-align:right;font-family:var(--mono)}
 .disc{font-size:12px;color:#7b8798;margin-top:14px;line-height:1.5}
 .pws{font-size:12px;color:var(--mut);margin-top:12px}
 .pws b{color:#fc4c02}
+
+/* ---------- lisibilité des métriques (surtout sur téléphone) ---------- */
+#jump{display:none}
+.ftiles{grid-template-columns:repeat(3,1fr);margin-bottom:10px}
+.read{margin:4px 0 14px;font-size:14px;color:#c4ccd8}
+h3.ch{margin:16px 0 6px;font-size:13px;color:#dbe4ee;font-weight:600}
+h3.ch small{color:var(--mut);font-weight:400}
+.legend{margin-top:8px}
+.hint{font-size:12px;color:var(--mut);margin:10px 0 0}
+.ctable{display:flex;flex-direction:column;gap:6px;margin-top:14px}
+.crow{display:grid;grid-template-columns:1.1fr 1.2fr .9fr .8fr;gap:8px;align-items:center;padding:8px 10px;border-radius:10px;background:var(--inp);border:1px solid var(--line)}
+.crow small{display:block;color:var(--mut);font-size:11px}
+.cl1 b{font-size:15px}.cv{font-family:var(--mono);font-weight:600;font-size:15px;color:var(--c3)}.cp{font-family:var(--mono);color:var(--mut);font-size:13px}
+.cd{font-family:var(--mono);font-weight:700;text-align:right;font-size:13px}.cd.up{color:#4ade80}.cd.down{color:#fb923c}
+.wrow{display:grid;grid-template-columns:76px 1fr 92px;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid #1b2430}
+.wd{font-size:13px;color:#c4ccd8}.wd em{display:block;font-style:normal;font-size:10px;color:var(--c5)}.wrow.now .wd{color:var(--c5)}
+.wbar{height:14px;background:var(--inp);border-radius:7px;overflow:hidden}.wbar i{display:block;height:100%;background:linear-gradient(90deg,var(--c1),var(--c5));border-radius:7px}
+.wv{text-align:right;font-family:var(--mono);font-size:13px}.wv small{display:block;color:var(--mut);font-size:10.5px}
+.zrow{display:grid;grid-template-columns:44px 1fr auto;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid #1b2430}
+.zn b{font-size:14px;font-weight:600}.zn small{display:block;color:var(--mut);font-size:12px;font-family:var(--mono)}
+.zt{text-align:right;font-family:var(--mono)}.zt small{display:block;color:var(--mut);font-size:11px}
+.climbs{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.clm{display:block;padding:10px 12px;border-radius:12px;background:var(--inp);border:1px solid var(--line);text-decoration:none;color:var(--txt)}
+.clm .l1{display:flex;gap:8px;align-items:center}.clm .l1 b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}.clm .l1 small{color:var(--mut);white-space:nowrap}
+.clm .l2{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px;font-size:13px;color:var(--mut)}.clm .l2 b{color:var(--txt);font-family:var(--mono)}
+@media (max-width:700px){
+  body{font-size:15px}.wrap{padding:10px 10px 80px}header h1{font-size:18px}
+  #jump{display:flex;gap:6px;overflow-x:auto;position:sticky;top:0;z-index:30;padding:8px 10px;margin:0 -10px 10px;background:rgba(10,14,19,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);scrollbar-width:none}
+  #jump::-webkit-scrollbar{display:none}
+  #jump a{flex:none;padding:8px 12px;border-radius:999px;background:var(--card2);border:1px solid var(--line);color:var(--txt);text-decoration:none;font-size:13px;white-space:nowrap}
+  .card{padding:12px;border-radius:14px;scroll-margin-top:56px}
+  .tiles{grid-template-columns:repeat(2,1fr);gap:8px}.tile b{font-size:21px}
+  .ftiles{grid-template-columns:repeat(3,1fr);gap:6px}.ftiles .tile{padding:8px}.ftiles .tile em{font-size:10.5px}
+  .btn{min-height:44px}input,select{font-size:16px;min-height:46px}
+  .climbs{grid-template-columns:1fr}.days{grid-template-columns:1fr}
+  .crow{grid-template-columns:1fr 1.15fr .85fr .8fr;padding:8px}.wrow{grid-template-columns:62px 1fr 84px;gap:8px}
+  .card h2{font-size:12px}
+}
 </style>
 </head>
 <body>
@@ -87,6 +125,10 @@ td.n,th.n{text-align:right;font-family:var(--mono)}
     <h1>VENTO</h1><small>Entraînement · puissance &amp; vitesse</small>
     <a class="btn" href="index.html">🗺️ Planificateur</a>
   </header>
+  <nav id="jump" aria-label="Aller à">
+    <a href="#cardConn">🔗 Strava</a><a href="#cardProfile">⚡ Profil</a><a href="#cardLoad">📈 Forme</a><a href="#cardCurve">🔥 Puissance</a>
+    <a href="#cardWeek">📊 Semaines</a><a href="#cardZones">🎯 Zones</a><a href="#cardClimbs">⛰️ Côtes</a><a href="#cardAdvice">💡 Conseils</a><a href="#cardPlan">🗓️ Plan</a>
+  </nav>
 
   <div id="demoBanner" class="banner" hidden>🧪 <b>Données de démonstration</b> — ce ne sont pas tes vraies sorties. <button class="btn sm" id="btnClearDemo">Effacer la démo</button></div>
 
@@ -135,31 +177,39 @@ td.n,th.n{text-align:right;font-family:var(--mono)}
 
     <section class="card half c2" id="cardLoad" hidden>
       <h2><span><span class="ic">📈</span>Forme &amp; fatigue</span><span class="tag" id="loadTag"></span></h2>
-      <canvas id="cvLoad" height="220"></canvas>
-      <div class="legend"><span><i style="background:var(--c1)"></i>Forme (CTL, 42 j)</span><span><i style="background:var(--c3)"></i>Fatigue (ATL, 7 j)</span><span><i style="background:var(--c4)"></i>Fraîcheur (TSB)</span></div>
+      <div class="tiles ftiles" id="ftiles"></div>
+      <p class="read" id="loadRead"></p>
+      <h3 class="ch">Forme et fatigue</h3>
+      <canvas id="cvLoad" height="200"></canvas>
+      <div class="legend"><span><i style="background:var(--c1)"></i>Forme (capacité, 42 j)</span><span><i style="background:var(--c3)"></i>Fatigue (charge, 7 j)</span></div>
+      <h3 class="ch">Fraîcheur <small>(forme − fatigue)</small></h3>
+      <canvas id="cvTsb" height="130"></canvas>
+      <div class="legend"><span><i style="background:#4ade80"></i>Reposé (positif)</span><span><i style="background:#fb923c"></i>Fatigué (négatif)</span></div>
     </section>
 
     <section class="card half c3" id="cardCurve" hidden>
       <h2><span><span class="ic">🔥</span>Courbe de puissance</span><span class="tag" id="curveTag"></span></h2>
-      <canvas id="cvCurve" height="220"></canvas>
+      <canvas id="cvCurve" height="230"></canvas>
       <div class="legend"><span><i style="background:var(--c3)"></i>42 derniers jours</span><span><i style="background:#64748b"></i>42 jours précédents</span></div>
+      <div class="ctable" id="curveTable"></div>
     </section>
 
     <section class="card half c5" id="cardWeek" hidden>
       <h2><span><span class="ic">📊</span>Charge hebdomadaire</span><span class="tag" id="weekTag"></span></h2>
-      <canvas id="cvWeek" height="200"></canvas>
+      <div id="weekBars"></div>
+      <p class="hint">TSS = charge d'entraînement (durée × intensité). Plus la barre est longue, plus la semaine était chargée.</p>
     </section>
 
     <section class="card half c6" id="cardZones" hidden>
       <h2><span><span class="ic">🎯</span>Temps par zone de puissance</span><span class="tag" id="zoneTag"></span></h2>
       <div class="zbar" id="zbar"></div>
-      <div class="legend" id="zleg"></div>
-      <div style="margin-top:12px"><table id="zTable"></table></div>
+      <div class="legend" id="zleg" hidden></div>
+      <div id="zList"></div>
     </section>
 
     <section class="card c7" id="cardClimbs" hidden>
       <h2><span><span class="ic">⛰️</span>Tes côtes</span><span class="tag" id="climbTag"></span></h2>
-      <div style="overflow-x:auto"><table id="climbTable"></table></div>
+      <div class="climbs" id="climbList"></div>
     </section>
 
     <section class="card c4" id="cardAdvice" hidden>
@@ -510,51 +560,97 @@ function buildPlan(m) {
 /* =====================================================================
    Rendu
    ===================================================================== */
+const MOB = () => innerWidth < 700;
 function ctxOf(cv) {
-  const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = +cv.getAttribute('height');
+  if (!cv.dataset.h) cv.dataset.h = cv.getAttribute('height');     // hauteur « logique » mémorisée (l'attribut height devient la hauteur en pixels écran)
+  const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = +cv.dataset.h;
   cv.width = W * dpr; cv.height = H * dpr; cv.style.height = H + 'px';
-  const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H); c.font = '11px ui-monospace,Consolas,monospace'; c.textBaseline = 'middle';
+  const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+  c.font = (MOB() ? 12.5 : 11) + 'px ui-monospace,Consolas,monospace'; c.textBaseline = 'middle';
   return { c, W, H };
 }
-function grid(c, W, H, pad, lo, hi, n, fmt = v => Math.round(v)) {
-  c.textAlign = 'right';
-  for (let i = 0; i <= n; i++) { const v = lo + (hi - lo) * i / n, y = pad.t + (1 - i / n) * (H - pad.t - pad.b); c.strokeStyle = '#1b2430'; c.beginPath(); c.moveTo(pad.l, y); c.lineTo(W - pad.r, y); c.stroke(); c.fillStyle = '#6b7788'; c.fillText(fmt(v), pad.l - 6, y); }
+function niceStep(range, target) {
+  const raw = range / target, p = 10 ** Math.floor(Math.log10(raw)), f = raw / p;
+  return (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * p;
 }
+function gridY(c, W, H, pad, lo, hi, step, fmt = v => Math.round(v)) {      // lignes horizontales aux multiples de « step »
+  c.textAlign = 'right'; c.lineWidth = 1;
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) {
+    const y = pad.t + (1 - (v - lo) / (hi - lo)) * (H - pad.t - pad.b);
+    c.strokeStyle = '#1f2937'; c.beginPath(); c.moveTo(pad.l, y); c.lineTo(W - pad.r, y); c.stroke();
+    c.fillStyle = '#9aa7b8'; c.fillText(fmt(v), pad.l - 7, y);
+  }
+}
+const dayLabel = d => new Date(d * DAY).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+const trend = (v, ref, unit = '') => ref == null ? '' : `${v - ref >= 0 ? '▲' : '▼'} ${Math.abs(v - ref).toFixed(0)}${unit} en 4 sem.`;
+
+/* ---- Forme & fatigue : 3 grosses valeurs lisibles, un graphique forme/fatigue, un graphique de fraîcheur ---- */
 function drawLoad(m) {
-  const { c, W, H } = ctxOf($('#cvLoad')), pad = { l: 38, r: 10, t: 10, b: 22 }, ser = m.series.slice(-120);
+  const l = m.last, ser = m.series.slice(-(MOB() ? 90 : 120));
+  const st = l.tsb > 15 ? ['Très frais', '#4ade80'] : l.tsb > 5 ? ['Frais', '#4ade80'] : l.tsb > -10 ? ['Équilibré', '#22d3ee'] : l.tsb > -30 ? ['Fatigué', '#fb923c'] : ['Très fatigué', '#ef4444'];
+  const ctl28 = m.ctl28;
+  $('#ftiles').innerHTML = [
+    tile('Forme', l.ctl.toFixed(0), '', ctl28 != null ? trend(l.ctl, ctl28) : 'capacité (42 j)', '#22d3ee'),
+    tile('Fatigue', l.atl.toFixed(0), '', 'charge récente (7 j)', '#f472b6'),
+    tile('Fraîcheur', (l.tsb >= 0 ? '+' : '') + l.tsb.toFixed(0), '', st[0], st[1])
+  ].join('');
+  const advice = l.tsb > 15 ? 'Tu es bien reposé : bon moment pour un objectif, un test ou une sortie ambitieuse.'
+    : l.tsb > -10 ? 'Équilibre sain entre charge et récupération : tu peux enchaîner des séances dures.'
+    : l.tsb > -30 ? 'Fatigue marquée : garde une séance dure maximum puis récupère (sorties faciles).'
+    : 'Fatigue très élevée : repos ou sorties très faciles pendant 2 à 3 jours.';
+  $('#loadRead').innerHTML = `<b style="color:${st[1]}">${st[0]}.</b> ${advice}`;
+  $('#loadTag').textContent = '';
   if (ser.length < 2) return;
-  const hi = Math.max(20, ...ser.map(s => Math.max(s.ctl, s.atl))) * 1.15, lo = Math.min(-10, ...ser.map(s => s.tsb)) * 1.15;
-  const x = i => pad.l + i / (ser.length - 1) * (W - pad.l - pad.r), y = v => pad.t + (1 - (v - lo) / (hi - lo)) * (H - pad.t - pad.b);
-  grid(c, W, H, pad, lo, hi, 4);
-  c.strokeStyle = '#33425a'; c.beginPath(); c.moveTo(pad.l, y(0)); c.lineTo(W - pad.r, y(0)); c.stroke();
-  const line = (key, col, wd) => { c.strokeStyle = col; c.lineWidth = wd; c.beginPath(); ser.forEach((s, i) => i ? c.lineTo(x(i), y(s[key])) : c.moveTo(x(i), y(s[key]))); c.stroke(); };
-  c.globalAlpha = .9; line('tsb', '#fb923c', 1.6); c.globalAlpha = 1; line('atl', '#f472b6', 1.8); line('ctl', '#22d3ee', 2.6);
-  c.fillStyle = '#6b7788'; c.textAlign = 'center';
-  [0, .25, .5, .75, 1].forEach(f => { const i = Math.round(f * (ser.length - 1)), d = new Date(ser[i].day * DAY); c.fillText(d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }), x(i), H - 8); });
-  $('#loadTag').textContent = `CTL ${m.last.ctl.toFixed(0)} · ATL ${m.last.atl.toFixed(0)} · TSB ${m.last.tsb >= 0 ? '+' : ''}${m.last.tsb.toFixed(0)}`;
+  const xs = (W, pad) => i => pad.l + i / (ser.length - 1) * (W - pad.l - pad.r), nLab = MOB() ? 3 : 5;
+  const labels = (c, W, H, pad, x) => { c.fillStyle = '#9aa7b8'; c.textAlign = 'center'; for (let k = 0; k < nLab; k++) { const i = Math.round(k / (nLab - 1) * (ser.length - 1)); c.textAlign = k === 0 ? 'left' : k === nLab - 1 ? 'right' : 'center'; c.fillText(dayLabel(ser[i].day), k === 0 ? pad.l : k === nLab - 1 ? W - pad.r : x(i), H - 9); } };
+  { // forme (CTL) + fatigue (ATL)
+    const { c, W, H } = ctxOf($('#cvLoad')), pad = { l: 38, r: 10, t: 12, b: 26 }, x = xs(W, pad);
+    const mx = Math.max(20, ...ser.map(s => Math.max(s.ctl, s.atl))), step = niceStep(mx, 3), hi = Math.ceil(mx * 1.05 / step) * step, y = v => pad.t + (1 - v / hi) * (H - pad.t - pad.b);
+    gridY(c, W, H, pad, 0, hi, step);
+    const g = c.createLinearGradient(0, pad.t, 0, H - pad.b); g.addColorStop(0, 'rgba(34,211,238,.30)'); g.addColorStop(1, 'rgba(34,211,238,0)');
+    c.beginPath(); c.moveTo(x(0), H - pad.b); ser.forEach((s, i) => c.lineTo(x(i), y(s.ctl))); c.lineTo(x(ser.length - 1), H - pad.b); c.closePath(); c.fillStyle = g; c.fill();
+    c.lineJoin = 'round'; c.lineCap = 'round';
+    const line = (key, col, wd) => { c.strokeStyle = col; c.lineWidth = wd; c.beginPath(); ser.forEach((s, i) => i ? c.lineTo(x(i), y(s[key])) : c.moveTo(x(i), y(s[key]))); c.stroke(); };
+    line('atl', '#f472b6', MOB() ? 2.2 : 1.8); line('ctl', '#22d3ee', MOB() ? 3.4 : 2.8);
+    const lx = x(ser.length - 1); [['ctl', '#22d3ee'], ['atl', '#f472b6']].forEach(([k, col]) => { c.fillStyle = col; c.beginPath(); c.arc(lx, y(l[k]), 4.5, 0, 7); c.fill(); });
+    labels(c, W, H, pad, x);
+  }
+  { // fraîcheur (TSB) en barres : vert = reposé, orange = fatigué
+    const { c, W, H } = ctxOf($('#cvTsb')), pad = { l: 38, r: 10, t: 10, b: 24 }, x = xs(W, pad);
+    const lo0 = Math.min(-10, ...ser.map(s => s.tsb)), hi0 = Math.max(10, ...ser.map(s => s.tsb)), step = niceStep(hi0 - lo0, 3), lo = Math.floor(lo0 / step) * step, hi = Math.ceil(hi0 / step) * step;
+    const y = v => pad.t + (1 - (v - lo) / (hi - lo)) * (H - pad.t - pad.b), bw = Math.max(1.5, (W - pad.l - pad.r) / ser.length * .72);
+    gridY(c, W, H, pad, lo, hi, step, v => (v > 0 ? '+' : '') + Math.round(v));
+    ser.forEach((s, i) => { c.fillStyle = s.tsb >= 0 ? 'rgba(74,222,128,.9)' : 'rgba(251,146,60,.9)'; const y0 = y(0), y1 = y(s.tsb); c.fillRect(x(i) - bw / 2, Math.min(y0, y1), bw, Math.max(1, Math.abs(y1 - y0))); });
+    c.strokeStyle = '#64748b'; c.lineWidth = 1.2; c.beginPath(); c.moveTo(pad.l, y(0)); c.lineTo(W - pad.r, y(0)); c.stroke();
+    labels(c, W, H, pad, x);
+  }
 }
+
+/* ---- Courbe de puissance : graphique épuré + tableau des durées clés ---- */
 function drawCurve(m) {
-  const { c, W, H } = ctxOf($('#cvCurve')), pad = { l: 42, r: 12, t: 12, b: 24 };
-  const all = [...m.curve.cur, ...m.curve.prev].filter(v => v > 0); if (!all.length) return;
-  const hi = Math.ceil(Math.max(...all) / 50) * 50 + 20, lo = 0;
-  const lx = Math.log(WIN[0]), rx = Math.log(WIN[WIN.length - 1]), x = w => pad.l + (Math.log(w) - lx) / (rx - lx) * (W - pad.l - pad.r), y = v => pad.t + (1 - v / hi) * (H - pad.t - pad.b);
-  grid(c, W, H, pad, lo, hi, 4);
-  c.textAlign = 'center'; c.fillStyle = '#6b7788'; WIN.forEach(w => { c.fillText(fmtWin(w), x(w), H - 9); });
-  const draw = (arr, col, wd) => { c.strokeStyle = col; c.lineWidth = wd; c.beginPath(); let st = false; arr.forEach((v, i) => { if (v > 0) { st ? c.lineTo(x(WIN[i]), y(v)) : c.moveTo(x(WIN[i]), y(v)); st = true; } }); c.stroke(); c.fillStyle = col; arr.forEach((v, i) => { if (v > 0) { c.beginPath(); c.arc(x(WIN[i]), y(v), 3, 0, 7); c.fill(); } }); };
-  draw(m.curve.prev, '#64748b', 1.8); draw(m.curve.cur, '#f472b6', 2.6);
+  const all = [...m.curve.cur, ...m.curve.prev].filter(v => v > 0); if (!all.length) { $('#curveTable').innerHTML = ''; return; }
+  const { c, W, H } = ctxOf($('#cvCurve')), pad = { l: 42, r: 14, t: 14, b: 28 };
+  const mx = Math.max(...all), step = niceStep(mx, 4), hi = Math.ceil(mx * 1.05 / step) * step, lx = Math.log(WIN[0]), rx = Math.log(WIN[WIN.length - 1]);
+  const x = w => pad.l + (Math.log(w) - lx) / (rx - lx) * (W - pad.l - pad.r), y = v => pad.t + (1 - v / hi) * (H - pad.t - pad.b);
+  gridY(c, W, H, pad, 0, hi, step);
+  const show = MOB() ? [5, 60, 300, 1200, 3600] : WIN; c.fillStyle = '#9aa7b8';
+  show.forEach(w => { c.textAlign = w === WIN[0] ? 'left' : w === WIN[WIN.length - 1] ? 'right' : 'center'; c.fillText(fmtWin(w), w === WIN[0] ? pad.l - 4 : w === WIN[WIN.length - 1] ? W - pad.r + 4 : x(w), H - 10); });
+  const draw = (arr, col, wd, r) => { c.strokeStyle = col; c.lineWidth = wd; c.lineJoin = 'round'; c.beginPath(); let st = false; arr.forEach((v, i) => { if (v > 0) { st ? c.lineTo(x(WIN[i]), y(v)) : c.moveTo(x(WIN[i]), y(v)); st = true; } }); c.stroke(); c.fillStyle = col; arr.forEach((v, i) => { if (v > 0) { c.beginPath(); c.arc(x(WIN[i]), y(v), r, 0, 7); c.fill(); } }); };
+  draw(m.curve.prev, '#64748b', 2, 3); draw(m.curve.cur, '#f472b6', MOB() ? 3.4 : 2.8, MOB() ? 4.5 : 3.5);
   const i20 = WIN.indexOf(1200), a = m.curve.cur[i20], b = m.curve.prev[i20];
-  $('#curveTag').textContent = a && b ? `20 min : ${a} W (${a - b >= 0 ? '+' : ''}${a - b} W)` : a ? `20 min : ${a} W` : '';
+  $('#curveTag').textContent = a && b ? `20 min : ${a} W (${a - b >= 0 ? '+' : ''}${a - b})` : a ? `20 min : ${a} W` : '';
+  const rows = [[5, '5 s', 'sprint'], [60, '1 min', 'anaérobie'], [300, '5 min', 'VO₂max'], [1200, '20 min', 'seuil'], [3600, '1 h', 'endurance']];
+  $('#curveTable').innerHTML = rows.map(([w, lab, sub]) => {
+    const i = WIN.indexOf(w), a = m.curve.cur[i], b = m.curve.prev[i], d = a && b ? a - b : null;
+    return `<div class="crow"><span class="cl1"><b>${lab}</b><small>${sub}</small></span><span class="cv">${a ? a + ' W' : '—'}<small>${a ? (a / m.weight).toFixed(2) + ' W/kg' : ''}</small></span><span class="cp">${b ? b + ' W' : '—'}<small>avant</small></span><span class="cd ${d == null ? '' : d >= 0 ? 'up' : 'down'}">${d == null ? '' : (d >= 0 ? '+' : '') + d + ' W'}</span></div>`;
+  }).join('');
 }
-function drawWeek(m) {
-  const { c, W, H } = ctxOf($('#cvWeek')), pad = { l: 38, r: 10, t: 10, b: 36 }, wk = m.weeks;
-  const hi = Math.max(100, ...wk.map(w => w.tss)) * 1.15; grid(c, W, H, pad, 0, hi, 4);
-  const bw = (W - pad.l - pad.r) / wk.length;
-  wk.forEach((w, i) => {
-    const x = pad.l + i * bw + bw * .15, h = w.tss / hi * (H - pad.t - pad.b), y = H - pad.b - h, g = c.createLinearGradient(0, y, 0, H - pad.b);
-    g.addColorStop(0, '#4ade80'); g.addColorStop(1, '#22d3ee'); c.fillStyle = g; c.fillRect(x, y, bw * .7, Math.max(1, h));
-    c.fillStyle = '#6b7788'; c.textAlign = 'center'; c.fillText(new Date(w.s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'numeric' }), x + bw * .35, H - 22); c.fillText(w.hours.toFixed(1) + 'h', x + bw * .35, H - 9);
-  });
-  const rec = wk.slice(-4); $('#weekTag').textContent = `moy. 4 sem. : ${(rec.reduce((a, w) => a + w.hours, 0) / 4).toFixed(1)} h · ${Math.round(rec.reduce((a, w) => a + w.km, 0) / 4)} km`;
+
+/* ---- Charge hebdomadaire : barres horizontales (une ligne par semaine, la plus récente en haut) ---- */
+function renderWeek(m) {
+  const wk = [...m.weeks].reverse(), mx = Math.max(100, ...wk.map(w => w.tss));
+  $('#weekBars').innerHTML = wk.map((w, i) => `<div class="wrow${i === 0 ? ' now' : ''}"><span class="wd">${new Date(w.s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}${i === 0 ? '<em>en cours</em>' : ''}</span><div class="wbar"><i style="width:${Math.max(w.tss ? 2 : 0, w.tss / mx * 100)}%"></i></div><span class="wv"><b>${w.hours.toFixed(1)} h</b><small>${Math.round(w.km)} km · ${Math.round(w.tss)} TSS</small></span></div>`).join('');
+  const rec = m.weeks.slice(-4); $('#weekTag').textContent = `moy. 4 sem. : ${(rec.reduce((a, w) => a + w.hours, 0) / 4).toFixed(1)} h`;
 }
 const tile = (label, val, unit, sub, col) => `<div class="tile" style="--t:${col}"><small>${label}</small><b>${val}<i>${unit}</i></b>${sub ? `<em>${sub}</em>` : ''}</div>`;
 
@@ -585,24 +681,25 @@ function render() {
     if (m.ftp) Rider.save({ ftp: m.ftp, weight: m.weight, mass: Math.round(m.mass * 10) / 10, k: 1, cda: null, hrmax: m.hrmax, cp: null, wp: null, source: 'manuel', updated: Date.now() });
     return;
   }
-  drawLoad(m); drawCurve(m); drawWeek(m);
-  // zones
+  drawLoad(m); drawCurve(m); renderWeek(m);
+  // zones : barre empilée + une ligne par zone
   if (m.ztot && m.ftp) {
     $('#zbar').innerHTML = m.zsec.map((s, i) => `<div style="width:${s / m.ztot * 100}%;background:${Rider.POWER_ZONES[i].c}" title="${Rider.POWER_ZONES[i].n}"></div>`).join('');
-    $('#zleg').innerHTML = m.zsec.map((s, i) => `<span><i style="background:${Rider.POWER_ZONES[i].c}"></i>${Rider.POWER_ZONES[i].n.split(' ')[0]} ${Math.round(s / m.ztot * 100)}%</span>`).join('');
-    $('#zTable').innerHTML = '<tr><th>Zone</th><th class="n">Puissance</th><th class="n">Cardio</th><th class="n">Temps (6 sem.)</th></tr>' + Rider.POWER_ZONES.map((z, i) => {
-      const hz = Rider.HR_ZONES[Math.min(4, Math.max(0, i - 1))];
-      return `<tr><td><span class="pill" style="background:${z.c}">${z.n.split(' ')[0]}</span> ${z.n.split(' ').slice(1).join(' ')}</td><td class="n">${Math.round(m.ftp * z.lo)}–${i === 6 ? '∞' : Math.round(m.ftp * z.hi)} W</td><td class="n">${i === 0 ? '< ' + Math.round(m.hrmax * .6) : i === 6 ? '—' : Math.round(m.hrmax * hz.lo) + '–' + Math.round(m.hrmax * hz.hi)} bpm</td><td class="n">${fmtDur(m.zsec[i])}</td></tr>`;
+    $('#zleg').innerHTML = '';
+    $('#zList').innerHTML = Rider.POWER_ZONES.map((z, i) => {
+      const hz = Rider.HR_ZONES[Math.min(4, Math.max(0, i - 1))], pct = Math.round(m.zsec[i] / m.ztot * 100);
+      const hr = i === 0 ? '< ' + Math.round(m.hrmax * .6) : i === 6 ? '—' : Math.round(m.hrmax * hz.lo) + '–' + Math.round(m.hrmax * hz.hi);
+      return `<div class="zrow"><span class="pill" style="background:${z.c}">${z.n.split(' ')[0]}</span><span class="zn"><b>${z.n.split(' ').slice(1).join(' ')}</b><small>${Math.round(m.ftp * z.lo)}–${i === 6 ? '∞' : Math.round(m.ftp * z.hi)} W · ${hr} bpm</small></span><span class="zt"><b>${fmtDur(m.zsec[i])}</b><small>${pct} %</small></span></div>`;
     }).join('');
     $('#zoneTag').textContent = `${fmtDur(m.ztot)} pédalées`;
-  } else { $('#zbar').innerHTML = ''; $('#zleg').innerHTML = ''; $('#zTable').innerHTML = '<tr><td class="mut">Analyse détaillée requise (sorties avec capteur de puissance).</td></tr>'; }
-  // côtes
+  } else { $('#zbar').innerHTML = ''; $('#zleg').innerHTML = ''; $('#zList').innerHTML = '<p class="mut">Analyse détaillée requise (sorties avec capteur de puissance).</p>'; }
+  // côtes : une carte par montée
   const cl = [...m.climbs].sort((a, b) => b.date - a.date).slice(0, 25);
   $('#climbTag').textContent = m.climbs.length ? `${m.climbs.length} montées sur 90 jours` : '';
-  $('#climbTable').innerHTML = cl.length ? '<tr><th>Date</th><th>Sortie</th><th>Catégorie</th><th class="n">Longueur</th><th class="n">Pente</th><th class="n">D+</th><th class="n">Temps</th><th class="n">Puissance</th><th class="n">W/kg</th><th class="n">VAM</th></tr>' + cl.map(c => {
+  $('#climbList').innerHTML = cl.length ? cl.map(c => {
     const cat = Rider.climbCat(c.len, c.gain / c.len);
-    return `<tr><td>${new Date(c.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</td><td><a href="https://www.strava.com/activities/${c.id}" target="_blank" rel="noopener">${esc(c.ride)}</a></td><td><span class="pill" style="background:${cat.c}">${cat.n}</span></td><td class="n">${(c.len / 1000).toFixed(1)} km</td><td class="n">${(c.gain / c.len * 100).toFixed(1)} %</td><td class="n">${c.gain} m</td><td class="n">${fmtDur(c.t)}</td><td class="n">${c.w} W</td><td class="n">${c.wkg.toFixed(2)}</td><td class="n">${Math.round(c.vam)}</td></tr>`;
-  }).join('') : '<tr><td class="mut">Aucune montée détectée (besoin de sorties analysées avec altitude).</td></tr>';
+    return `<a class="clm" href="https://www.strava.com/activities/${c.id}" target="_blank" rel="noopener"><div class="l1"><span class="pill" style="background:${cat.c}">${cat.n}</span><b>${esc(c.ride)}</b><small>${new Date(c.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</small></div><div class="l2"><span><b>${(c.len / 1000).toFixed(1)}</b> km</span><span><b>${(c.gain / c.len * 100).toFixed(1)}</b> %</span><span>+<b>${c.gain}</b> m</span><span><b>${fmtDur(c.t)}</b></span><span><b>${c.w}</b> W</span><span><b>${c.wkg.toFixed(2)}</b> W/kg</span><span>VAM <b>${Math.round(c.vam)}</b></span></div></a>`;
+  }).join('') : '<p class="mut">Aucune montée détectée (besoin de sorties analysées avec altitude).</p>';
   // conseils
   const adv = advise(m);
   $('#advice').innerHTML = adv.map(a => `<div class="find ${a.sev}"><div style="font-size:20px">${a.sev === 'good' ? '✅' : a.sev === 'warn' ? '⚠️' : '💡'}</div><div><b>${a.title}</b><p>${a.text}</p></div></div>`).join('');
@@ -662,7 +759,7 @@ $('#btnLogout').onclick = () => { S = { cid: S.cid, secret: S.secret }; store.de
 $('#btnClearDemo').onclick = () => { rides = []; isDemo = false; store.del('vento.rides'); store.del('vento.demo'); Rider.clear(); setStatus('Démo effacée.'); refresh(); };
 [['ovFtp', 'ftp'], ['ovW', 'weight'], ['ovHr', 'hrmax']].forEach(([id, k]) => $('#' + id).onchange = e => { const v = parseFloat(e.target.value); if (v > 0) ov[k] = v; else delete ov[k]; store.set('vento.profile', ov); refresh(); });
 // redessine seulement les graphiques : le clavier du téléphone déclenche « resize » et ne doit pas réinitialiser les champs
-let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (M && !$('#cardLoad').hidden) { drawLoad(M); drawCurve(M); drawWeek(M); } }, 150); });
+let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (M && !$('#cardLoad').hidden) { drawLoad(M); drawCurve(M); } }, 150); });
 ['cid', 'csec'].forEach(id => $('#' + id).addEventListener('input', e => { e.target.dataset.dirty = '1'; }));
 $('.cbDomain').textContent = location.hostname || 'localhost';
 $('.siteUrl').textContent = location.origin.startsWith('http') ? location.origin : 'http://localhost:8765';
