@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Vento — Entraînement</title>
+<meta name="theme-color" content="#0a0e13">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+:root{--bg:#0a0e13;--panel:#0f141b;--card:#151b24;--card2:#1a222d;--line:#232c39;--txt:#e6ebf2;--mut:#8b97a8;--inp:#0d1219;
+  --c1:#22d3ee;--c2:#a78bfa;--c3:#f472b6;--c4:#fb923c;--c5:#4ade80;--c6:#60a5fa;--c7:#fbbf24;--bad:#ef4444;--warn:#f59e0b;
+  --mono:ui-monospace,SFMono-Regular,"Cascadia Mono",Consolas,Menlo,monospace;--r:14px}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+body{min-height:100%;background:radial-gradient(700px 360px at 0 0,rgba(34,211,238,.14),transparent 70%),radial-gradient(600px 400px at 100% 20%,rgba(167,139,250,.13),transparent 70%),radial-gradient(500px 360px at 20% 100%,rgba(244,114,182,.10),transparent 70%),var(--bg);background-attachment:fixed}
+a{color:var(--c1)}
+button,input,select{font:inherit;color:inherit}
+.wrap{max-width:1180px;margin:0 auto;padding:16px 16px 60px}
+header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+header h1{margin:0;font-size:20px;letter-spacing:.2em;background:linear-gradient(90deg,var(--c1),var(--c2) 55%,var(--c3));-webkit-background-clip:text;background-clip:text;color:transparent}
+header small{color:var(--mut);flex:1}
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:14px}
+.card{--a:var(--c1);grid-column:span 12;border:1px solid color-mix(in srgb,var(--a) 30%,var(--line));border-top:3px solid var(--a);border-radius:var(--r);padding:14px;background:linear-gradient(180deg,color-mix(in srgb,var(--a) 11%,var(--card)),var(--card) 75%);min-width:0}
+.card.half{grid-column:span 6}.card.third{grid-column:span 4}
+@media(max-width:900px){.card.half,.card.third{grid-column:span 12}}
+.card h2{margin:0 0 12px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:color-mix(in srgb,var(--a) 65%,#fff);font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.ic{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:8px;margin-right:8px;background:color-mix(in srgb,var(--a) 24%,transparent);font-size:13px;vertical-align:middle}
+.tag{color:var(--a);text-transform:none;letter-spacing:0;font-weight:500;font-size:12px}
+.c1{--a:var(--c1)}.c2{--a:var(--c2)}.c3{--a:var(--c3)}.c4{--a:var(--c4)}.c5{--a:var(--c5)}.c6{--a:var(--c6)}.c7{--a:var(--c7)}
+.mut{color:var(--mut)}.mono{font-family:var(--mono)}
+.btn{background:var(--card2);border:1px solid var(--line);border-radius:9px;padding:8px 12px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:.15s;text-decoration:none;color:var(--txt);white-space:nowrap}
+.btn:hover{border-color:#3a4658;background:#202a37}
+.btn.primary{background:linear-gradient(135deg,var(--c1),var(--c2));border-color:transparent;color:#061425;font-weight:700}
+.btn.strava{background:#fc4c02;border-color:#fc4c02;color:#fff;font-weight:700}
+.btn.sm{padding:5px 9px;font-size:12px}
+.btn[disabled]{opacity:.45;pointer-events:none}
+input,select{background:var(--inp);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0;outline:none;color-scheme:dark}
+input:focus,select:focus{border-color:var(--a)}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mut)}
+.row{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}.row>*{flex:1;min-width:140px}
+.row.nof>*{flex:none}
+details{margin:10px 0;background:var(--inp);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+details summary{cursor:pointer;color:var(--c1)}
+details ol{margin:8px 0 2px 18px;padding:0;color:#c4ccd8}
+details li{margin:4px 0}
+code{font-family:var(--mono);background:#1b2430;padding:1px 6px;border-radius:5px;font-size:12px}
+.status{font-size:13px;color:var(--c1);min-height:20px;margin-top:8px}
+.status.err{color:var(--warn)}
+.bar{height:8px;border-radius:5px;background:var(--inp);border:1px solid var(--line);overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--c1),var(--c2));width:0;transition:width .3s}
+.banner{padding:10px 14px;border-radius:10px;margin-bottom:14px;border:1px solid color-mix(in srgb,var(--warn) 60%,transparent);background:rgba(245,158,11,.1);font-size:13px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+.tile{--t:var(--c1);background:linear-gradient(160deg,color-mix(in srgb,var(--t) 16%,var(--inp)),var(--inp) 80%);border:1px solid color-mix(in srgb,var(--t) 38%,var(--line));border-radius:11px;padding:10px 12px}
+.tile small{display:block;color:color-mix(in srgb,var(--t) 55%,var(--mut));font-size:10.5px;letter-spacing:.08em;text-transform:uppercase}
+.tile b{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--t);letter-spacing:-.02em}
+.tile b i{font-style:normal;font-size:11px;color:var(--mut);margin-left:3px;font-weight:400}
+.tile em{display:block;font-style:normal;font-size:11.5px;color:var(--mut)}
+canvas{width:100%;display:block}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);text-align:left;font-weight:600;padding:4px 8px}
+td{padding:7px 8px;border-top:1px solid var(--line)}
+td.n,th.n{text-align:right;font-family:var(--mono)}
+.pill{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;color:#06101c}
+.zbar{display:flex;height:22px;border-radius:7px;overflow:hidden;border:1px solid var(--line);margin:6px 0 10px}
+.zbar div{height:100%}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:#c4ccd8}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.find{display:flex;gap:12px;padding:11px 12px;border-radius:11px;border:1px solid var(--line);background:var(--inp);margin-bottom:9px;border-left-width:4px}
+.find.good{border-left-color:var(--c5)}.find.info{border-left-color:var(--c6)}.find.warn{border-left-color:var(--warn)}
+.find b{display:block;margin-bottom:2px}
+.find p{margin:0;color:#c4ccd8;font-size:13px}
+.days{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.day{border:1px solid var(--line);border-radius:12px;padding:11px;background:var(--inp);border-top:3px solid var(--d,var(--c6))}
+.day h3{margin:0 0 3px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);display:flex;justify-content:space-between}
+.day h4{margin:0 0 4px;font-size:14px;color:var(--d,var(--c6))}
+.day p{margin:4px 0 0;font-size:12.5px;color:#c4ccd8}
+.day .k{font-family:var(--mono);font-size:12px;color:var(--txt)}
+.disc{font-size:12px;color:#7b8798;margin-top:14px;line-height:1.5}
+.pws{font-size:12px;color:var(--mut);margin-top:12px}
+.pws b{color:#fc4c02}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>VENTO</h1><small>Entraînement · puissance &amp; vitesse</small>
+    <a class="btn" href="index.html">🗺️ Planificateur</a>
+  </header>
+
+  <div id="demoBanner" class="banner" hidden>🧪 <b>Données de démonstration</b> — ce ne sont pas tes vraies sorties. <button class="btn sm" id="btnClearDemo">Effacer la démo</button></div>
+
+  <div class="grid">
+    <!-- Connexion -->
+    <section class="card c4" id="cardConn">
+      <h2><span><span class="ic">🔗</span>Connexion Strava</span><span class="tag" id="connTag"></span></h2>
+      <div id="connSetup">
+        <details>
+          <summary>Première connexion : créer ton application Strava (2 minutes)</summary>
+          <ol>
+            <li>Ouvre <a href="https://www.strava.com/settings/api" target="_blank" rel="noopener">strava.com/settings/api</a> et crée une application (nom : <code>Vento</code>, catégorie : <code>Training</code>, site web : <code>http://localhost:8765</code>).</li>
+            <li>Dans <b>Authorization Callback Domain</b> écris : <code>localhost</code></li>
+            <li>Copie le <b>Client ID</b> et le <b>Client Secret</b>, colle-les ci-dessous (ils restent dans ton navigateur).</li>
+            <li>Ouvre cette page via <code>http://localhost:8765/training.html</code> (lance <code>serve.ps1</code>) puis clique « Se connecter à Strava ».</li>
+          </ol>
+        </details>
+        <div class="row">
+          <label class="f">Client ID<input id="cid" type="text" inputmode="numeric" autocomplete="off"></label>
+          <label class="f">Client Secret<input id="csec" type="password" autocomplete="off"></label>
+        </div>
+      </div>
+      <div class="row nof" style="margin-top:12px">
+        <button class="btn strava" id="btnConnect">Se connecter à Strava</button>
+        <button class="btn primary" id="btnSync" hidden>⟳ Synchroniser mes sorties</button>
+        <button class="btn" id="btnMore" hidden>Analyser plus de sorties</button>
+        <button class="btn" id="btnDemo">🧪 Voir une démo</button>
+        <button class="btn" id="btnLogout" hidden>Déconnecter</button>
+      </div>
+      <div class="bar" id="bar" hidden><i id="barI"></i></div>
+      <div class="status" id="status"></div>
+      <div class="pws">Données <b>Strava</b> — <a href="https://www.strava.com" target="_blank" rel="noopener">Powered by Strava</a>. Analyse locale dans ton navigateur : rien n'est envoyé ailleurs.</div>
+    </section>
+
+    <!-- Profil -->
+    <section class="card c1" id="cardProfile" hidden>
+      <h2><span><span class="ic">⚡</span>Ton profil</span><span class="tag" id="profTag"></span></h2>
+      <div class="tiles" id="tiles"></div>
+      <div class="row" style="margin-top:12px">
+        <label class="f">FTP (W) — vide = automatique<input id="ovFtp" type="number" min="80" max="600" step="1"></label>
+        <label class="f">Poids (kg)<input id="ovW" type="number" min="35" max="200" step=".5"></label>
+        <label class="f">FC max (bpm)<input id="ovHr" type="number" min="120" max="230" step="1"></label>
+      </div>
+      <p class="mut" style="font-size:12px;margin:8px 0 0">Ce profil est utilisé automatiquement par le <a href="index.html">planificateur</a> pour estimer ton temps (puissance, côtes, calibrage).</p>
+    </section>
+
+    <section class="card half c2" id="cardLoad" hidden>
+      <h2><span><span class="ic">📈</span>Forme &amp; fatigue</span><span class="tag" id="loadTag"></span></h2>
+      <canvas id="cvLoad" height="220"></canvas>
+      <div class="legend"><span><i style="background:var(--c1)"></i>Forme (CTL, 42 j)</span><span><i style="background:var(--c3)"></i>Fatigue (ATL, 7 j)</span><span><i style="background:var(--c4)"></i>Fraîcheur (TSB)</span></div>
+    </section>
+
+    <section class="card half c3" id="cardCurve" hidden>
+      <h2><span><span class="ic">🔥</span>Courbe de puissance</span><span class="tag" id="curveTag"></span></h2>
+      <canvas id="cvCurve" height="220"></canvas>
+      <div class="legend"><span><i style="background:var(--c3)"></i>42 derniers jours</span><span><i style="background:#64748b"></i>42 jours précédents</span></div>
+    </section>
+
+    <section class="card half c5" id="cardWeek" hidden>
+      <h2><span><span class="ic">📊</span>Charge hebdomadaire</span><span class="tag" id="weekTag"></span></h2>
+      <canvas id="cvWeek" height="200"></canvas>
+    </section>
+
+    <section class="card half c6" id="cardZones" hidden>
+      <h2><span><span class="ic">🎯</span>Temps par zone de puissance</span><span class="tag" id="zoneTag"></span></h2>
+      <div class="zbar" id="zbar"></div>
+      <div class="legend" id="zleg"></div>
+      <div style="margin-top:12px"><table id="zTable"></table></div>
+    </section>
+
+    <section class="card c7" id="cardClimbs" hidden>
+      <h2><span><span class="ic">⛰️</span>Tes côtes</span><span class="tag" id="climbTag"></span></h2>
+      <div style="overflow-x:auto"><table id="climbTable"></table></div>
+    </section>
+
+    <section class="card c4" id="cardAdvice" hidden>
+      <h2><span><span class="ic">💡</span>Analyse &amp; conseils pour progresser</span></h2>
+      <div id="advice"></div>
+    </section>
+
+    <section class="card c2" id="cardPlan" hidden>
+      <h2><span><span class="ic">🗓️</span>Plan des 7 prochains jours</span><span class="tag" id="planTag"></span></h2>
+      <div class="days" id="days"></div>
+      <p class="disc">Ces conseils sont des repères généraux calculés à partir de tes données, pas un programme de coach personnalisé. Écoute ton corps, adapte en cas de fatigue ou de douleur et demande un avis médical au moindre doute.</p>
+    </section>
+  </div>
+</div>
+
+<script src="rider.js"></script>
+<script>
+'use strict';
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const median = a => { if (!a.length) return null; const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } },
+  del(k) { try { localStorage.removeItem(k); } catch {} }
+};
+const DAY = 864e5, WIN = [5, 30, 60, 300, 600, 1200, 1800, 3600];
+const fmtDur = s => { const m = Math.round(s / 60), h = Math.floor(m / 60); return h ? `${h} h ${String(m % 60).padStart(2, '0')}` : `${m} min`; };
+const fmtWin = w => w < 60 ? w + ' s' : w < 3600 ? w / 60 + ' min' : '1 h';
+
+let S = store.get('vento.strava', {});       // identifiants + jetons (restent dans ce navigateur)
+let rides = store.get('vento.rides', []);     // résumés + détails calculés
+let ov = store.get('vento.profile', {});      // valeurs saisies à la main
+let isDemo = store.get('vento.demo', false);
+let M = null;                                 // modèle calculé
+
+/* =====================================================================
+   Strava : OAuth + API
+   ===================================================================== */
+const redirectUri = () => location.origin + location.pathname;
+function setStatus(msg, err = false) { const s = $('#status'); s.textContent = msg; s.classList.toggle('err', err); }
+function setBar(p) { $('#bar').hidden = p == null; if (p != null) $('#barI').style.width = Math.round(p * 100) + '%'; }
+
+function connect() {
+  const cid = $('#cid').value.trim(), sec = $('#csec').value.trim();
+  if (!cid || !sec) return setStatus('Renseigne le Client ID et le Client Secret (voir le pas à pas ci-dessus).', true);
+  if (!/^https?:$/.test(location.protocol)) return setStatus('Ouvre cette page via http://localhost:8765/training.html (lance serve.ps1) : Strava refuse les pages « file:// ».', true);
+  S = { ...S, cid, secret: sec }; store.set('vento.strava', S);
+  const q = new URLSearchParams({ client_id: cid, response_type: 'code', redirect_uri: redirectUri(), approval_prompt: 'auto', scope: 'read,activity:read_all' });
+  location.href = 'https://www.strava.com/oauth/authorize?' + q;
+}
+async function tokenRequest(body) {
+  const r = await fetch('https://www.strava.com/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: S.cid, client_secret: S.secret, ...body }) });
+  if (!r.ok) throw new Error('Strava a refusé la connexion (' + r.status + ') — vérifie le Client ID / Secret et le domaine de rappel « localhost ».');
+  const j = await r.json();
+  S = { ...S, access: j.access_token, refresh: j.refresh_token, exp: j.expires_at, athlete: { ...(S.athlete || {}), ...(j.athlete ? { id: j.athlete.id, firstname: j.athlete.firstname } : {}) } };
+  store.set('vento.strava', S);
+}
+async function accessToken() {
+  if (!S.refresh) throw new Error('Non connecté');
+  if (!S.access || S.exp - 60 < Date.now() / 1000) await tokenRequest({ grant_type: 'refresh_token', refresh_token: S.refresh });
+  return S.access;
+}
+async function api(path) {
+  const r = await fetch('https://www.strava.com/api/v3' + path, { headers: { Authorization: 'Bearer ' + await accessToken() } });
+  if (r.status === 429) throw Object.assign(new Error('Limite Strava atteinte (100 requêtes / 15 min). Réessaie dans un moment.'), { rate: true });
+  if (r.status === 404) throw Object.assign(new Error('404'), { nf: true });
+  if (!r.ok) throw new Error('Erreur Strava ' + r.status);
+  return r.json();
+}
+async function handleCallback() {
+  const q = new URLSearchParams(location.search);
+  if (!q.has('code') && !q.has('error')) return;
+  history.replaceState({}, '', location.pathname);
+  if (q.get('error')) return setStatus('Connexion refusée sur Strava.', true);
+  if (!(q.get('scope') || '').includes('activity:read')) setStatus('Attention : l\'accès aux activités n\'a pas été autorisé (coche « Afficher les données de mes activités »).', true);
+  try {
+    setStatus('Connexion en cours…'); await tokenRequest({ grant_type: 'authorization_code', code: q.get('code') });
+    setStatus('Connecté à Strava ✓ — clique sur « Synchroniser mes sorties ».');
+  } catch (e) { setStatus(e.message, true); }
+}
+
+const RIDE_TYPES = new Set(['Ride', 'GravelRide', 'MountainBikeRide', 'VirtualRide']);
+async function syncActivities() {
+  try {
+    setBar(0); setStatus('Récupération de ton profil et de tes sorties…');
+    const ath = await api('/athlete'); S.athlete = { id: ath.id, firstname: ath.firstname, weight: ath.weight || null, ftp: ath.ftp || null }; store.set('vento.strava', S);
+    const after = Math.floor((Date.now() - 400 * DAY) / 1000), list = [];
+    for (let page = 1; page <= 4; page++) { const a = await api(`/athlete/activities?per_page=100&page=${page}&after=${after}`); list.push(...a); if (a.length < 100) break; }
+    const old = new Map(rides.map(r => [r.id, r]));
+    rides = list.filter(a => RIDE_TYPES.has(a.sport_type || a.type)).map(a => ({
+      ...(old.get(a.id) || {}), id: a.id, name: a.name, date: Date.parse(a.start_date), type: a.sport_type || a.type, dist: a.distance, time: a.moving_time,
+      gain: a.total_elevation_gain, avgW: a.average_watts || 0, npW: a.weighted_average_watts || 0, devW: !!a.device_watts, avgHR: a.average_heartrate || 0,
+      maxHR: a.max_heartrate || 0, kj: a.kilojoules || 0, avgV: a.average_speed
+    })).sort((x, y) => y.date - x.date);
+    isDemo = false; store.set('vento.demo', false); persistRides();
+    setStatus(`${rides.length} sorties à vélo trouvées. Analyse détaillée des plus récentes…`);
+    await detailBatch(25);
+  } catch (e) { setBar(null); setStatus(e.message, true); }
+  refresh();
+}
+async function detailBatch(n) {
+  const todo = rides.filter(r => r.devW && r.d === undefined).slice(0, n);
+  if (!todo.length) { setBar(null); setStatus(`${rides.filter(r => r.d).length} sorties analysées en détail ✓`); return; }
+  let done = 0;
+  for (const r of todo) {
+    try {
+      const st = await api(`/activities/${r.id}/streams?keys=time,distance,altitude,watts,heartrate,velocity_smooth&key_by_type=true`);
+      r.d = summarize(st) || null;
+    } catch (e) {
+      if (e.nf) r.d = null;
+      else { setBar(null); persistRides(); refresh(); return setStatus(e.message + ` (${done}/${todo.length} analysées)`, true); }
+    }
+    done++; setBar(done / todo.length); setStatus(`Analyse des sorties… ${done}/${todo.length}`);
+    if (done % 5 === 0) { persistRides(); }
+  }
+  persistRides(); setBar(null);
+  const left = rides.filter(r => r.devW && r.d === undefined).length;
+  setStatus(`${rides.filter(r => r.d).length} sorties analysées ✓${left ? ` — ${left} de plus disponibles (bouton « Analyser plus »)` : ''}`);
+}
+function persistRides() { if (!store.set('vento.rides', rides)) setStatus('Stockage du navigateur plein : certaines données n\'ont pas pu être enregistrées.', true); }
+
+/* =====================================================================
+   Analyse d'une sortie à partir de ses flux (1 échantillon ≈ 1 s)
+   ===================================================================== */
+function summarize(st) {
+  const t = st.time?.data; if (!t || t.length < 120) return null;
+  const n = t.length, T = Math.floor(t[n - 1]), g = k => st[k]?.data;
+  const W = g('watts'), HR = g('heartrate'), V = g('velocity_smooth'), D = g('distance'), A = g('altitude');
+  if (!W) return null;
+  const p = new Float32Array(T + 1), h = new Float32Array(T + 1), v = new Float32Array(T + 1), d = new Float32Array(T + 1), a = new Float32Array(T + 1);
+  let j = 0;
+  for (let s = 0; s <= T; s++) {
+    while (j < n - 1 && t[j + 1] <= s) j++;
+    const gap = s - t[j] > 5;
+    p[s] = gap ? 0 : (W[j] || 0); h[s] = gap || !HR ? 0 : (HR[j] || 0); v[s] = gap || !V ? 0 : (V[j] || 0); d[s] = D ? D[j] : 0; a[s] = A ? A[j] : 0;
+  }
+  const cs = new Float64Array(T + 2), ch = new Float64Array(T + 2);
+  for (let s = 0; s <= T; s++) { cs[s + 1] = cs[s] + p[s]; ch[s + 1] = ch[s] + h[s]; }
+  const pc = {};
+  for (const w of WIN) if (T + 1 >= w) { let b = 0; for (let s = 0; s + w <= T + 1; s++) { const m = (cs[s + w] - cs[s]) / w; if (m > b) b = m; } pc[w] = Math.round(b); }
+  let np4 = 0, npc = 0;
+  for (let s = 29; s <= T; s++) { const m = (cs[s + 1] - cs[s - 29]) / 30; np4 += m ** 4; npc++; }
+  const np = npc ? Math.round((np4 / npc) ** .25) : 0;
+  const moving = s => V ? v[s] > .8 : p[s] > 0;
+  let movT = 0, ped = 0, pedN = 0; const phB = {}, hhB = {};
+  for (let s = 0; s <= T; s++) {
+    if (moving(s)) movT++;
+    if (p[s] > 20) { ped += p[s]; pedN++; }
+    if (p[s] > 0) { const b = Math.min(70, Math.floor(p[s] / 10)); phB[b] = (phB[b] || 0) + 1; }
+    if (h[s] > 0) { const b = Math.floor(h[s] / 2); hhB[b] = (hhB[b] || 0) + 1; }
+  }
+  const out = { T, movT, np, pedalW: pedN ? Math.round(ped / pedN) : 0, pc, ph: Object.entries(phB).map(([b, c]) => [+b, c]), hh: Object.entries(hhB).map(([b, c]) => [+b, c]) };
+  // altitude lissée
+  const as = new Float32Array(T + 1);
+  if (A) for (let s = 0; s <= T; s++) { let sum = 0, c = 0; for (let k = Math.max(0, s - 5); k <= Math.min(T, s + 5); k++) { sum += a[k]; c++; } as[s] = sum / c; }
+  if (D && A && d[T] > 2000) {
+    const first = (dist, from) => { let s = from; while (s < T && d[s] < dist) s++; return s; };
+    const altAt = (step) => { const alt = [], ts = []; let s = 0; for (let k = 0; ; k++) { s = first(k * step, s); if (d[s] < k * step) break; alt.push(as[s]); ts.push(s); if (s >= T) break; } return { alt, ts }; };
+    const c200 = altAt(200); out.dd = Math.round(d[T]);
+    out.prof = []; for (let k = 0; k < c200.alt.length - 1; k++) out.prof.push(Math.round(clamp((c200.alt[k + 1] - c200.alt[k]) / 200, -.25, .25) * 1000));
+    const c50 = altAt(50), alt50 = c50.alt.map((_, i, arr) => (arr[Math.max(0, i - 1)] + arr[i] + arr[Math.min(arr.length - 1, i + 1)]) / 3);
+    out.climbs = Rider.detectClimbs(alt50, 50).map(c => {
+      const s0 = c50.ts[c.i0], s1 = c50.ts[c.i1], dt = Math.max(1, s1 - s0);
+      return { d0: c.i0 * 50, len: Math.round(c.len), gain: Math.round(c.gain), t: dt, w: Math.round((cs[s1 + 1] - cs[s0]) / (dt + 1)), hr: Math.round((ch[s1 + 1] - ch[s0]) / (dt + 1)) };
+    });
+  }
+  // points « plat régulier » pour estimer le CdA
+  const flat = [];
+  for (let s = 10; s <= T; s += 10) {
+    let mn = 99, mx = 0, vs = 0, ps = 0;
+    for (let k = s - 10; k < s; k++) { mn = Math.min(mn, v[k]); mx = Math.max(mx, v[k]); vs += v[k]; ps += p[k]; }
+    const vm = vs / 10, pm = ps / 10, gr = vm > 0 && A ? (as[s] - as[s - 10]) / (vm * 10) : 9;
+    if (vm > 5 && pm > 100 && mx - mn < .7 && Math.abs(gr) < .012) flat.push([Math.round(vm * 10), Math.round(pm)]);
+  }
+  const step = Math.max(1, Math.ceil(flat.length / 200)); out.flat = flat.filter((_, i) => i % step === 0);
+  // dérive cardio (découplage)
+  const mv = []; for (let s = 0; s <= T; s++) if (moving(s) && h[s] > 0) mv.push(s);
+  if (mv.length > 3600) {
+    const ef = arr => { let ps = 0, hs = 0; for (const s of arr) { ps += p[s]; hs += h[s]; } return ps / hs; };
+    const e1 = ef(mv.slice(0, mv.length >> 1)), e2 = ef(mv.slice(mv.length >> 1)); out.dec = Math.round((e1 - e2) / e1 * 1000) / 10;
+  }
+  return out;
+}
+
+/* =====================================================================
+   Modèle : FTP, CP, calibrage, charge, zones, côtes…
+   ===================================================================== */
+function computeModel() {
+  const now = Date.now(), det = rides.filter(r => r.d);
+  const within = (list, d0, d1) => list.filter(r => now - r.date >= d0 * DAY && now - r.date < d1 * DAY);
+  const best = (list, w) => Math.max(0, ...list.map(r => r.d.pc[w] || 0));
+  const r90 = within(det, 0, 90), cur = within(det, 0, 42), prev = within(det, 42, 84);
+  const b20 = best(r90, 1200), b60 = best(r90, 3600);
+  const ftpAuto = Math.round(Math.max(b20 * .95, b60)) || S.athlete?.ftp || 0;
+  const ftp = ov.ftp || ftpAuto;
+  const weight = ov.weight || S.athlete?.weight || 75, mass = weight + 9;
+  const hrmax = ov.hrmax || Math.max(0, ...rides.map(r => r.maxHR || 0)) || 190;
+  // puissance critique (CP / W')
+  const pts = [[300, best(r90, 300)], [1200, b20], [3600, b60]].filter(x => x[1] > 0).map(([t, P]) => [t, P * t]);
+  let cp = null, wp = null;
+  if (pts.length >= 2) {
+    const n = pts.length, sx = pts.reduce((s, x) => s + x[0], 0), sy = pts.reduce((s, x) => s + x[1], 0), sxy = pts.reduce((s, x) => s + x[0] * x[1], 0), sxx = pts.reduce((s, x) => s + x[0] * x[0], 0);
+    cp = Math.round((n * sxy - sx * sy) / (n * sxx - sx * sx)); wp = Math.round((sy - cp * sx) / n / 100) / 10;
+  }
+  // calibrage du modèle (temps réel / temps prédit) et CdA
+  const ks = [], cdas = [];
+  for (const r of det) {
+    const d = r.d;
+    if (d.prof?.length > 75 && d.pedalW > 60 && d.dd > 15000) {
+      let pt = 0; for (const g of d.prof) pt += 200 / Rider.solveSpeed(d.pedalW, mass, .36, .0045, g / 1000, 0);
+      ks.push((d.movT * (d.prof.length * 200 / d.dd)) / pt);
+    }
+    for (const [v10, P] of d.flat || []) { const c = Rider.cdaFrom(P, mass, .0045, v10 / 10); if (c > .15 && c < .8) cdas.push(c); }
+  }
+  const k = ks.length >= 3 ? clamp(median(ks), .75, 1.5) : null, cda = cdas.length >= 40 ? median(cdas) : null;
+  // charge : TSS / CTL / ATL
+  const tssOf = r => { const hrs = r.time / 3600; if (r.devW && r.npW && ftp) return hrs * (r.npW / ftp) ** 2 * 100; return hrs * 50; };
+  const byDay = new Map(); rides.forEach(r => { const k = Math.floor(r.date / DAY); byDay.set(k, (byDay.get(k) || 0) + tssOf(r)); });
+  const series = []; let ctl = 0, atl = 0;
+  if (rides.length) {
+    const d0 = Math.min(...byDay.keys()), d1 = Math.floor(now / DAY);
+    for (let dd = d0; dd <= d1; dd++) { const tss = byDay.get(dd) || 0; const tsb = ctl - atl; ctl += (tss - ctl) / 42; atl += (tss - atl) / 7; series.push({ day: dd, tss, ctl, atl, tsb }); }
+  }
+  const last = series[series.length - 1] || { ctl: 0, atl: 0, tsb: 0 };
+  const ctl28 = series[series.length - 29]?.ctl ?? null;
+  // semaines
+  const weeks = []; const mon = new Date(); mon.setHours(0, 0, 0, 0); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
+  for (let w = 11; w >= 0; w--) {
+    const s = mon.getTime() - w * 7 * DAY, e = s + 7 * DAY, rs = rides.filter(r => r.date >= s && r.date < e);
+    weeks.push({ s, hours: rs.reduce((a, r) => a + r.time, 0) / 3600, km: rs.reduce((a, r) => a + r.dist, 0) / 1000, gain: rs.reduce((a, r) => a + (r.gain || 0), 0), tss: rs.reduce((a, r) => a + tssOf(r), 0), n: rs.length });
+  }
+  // zones de puissance (6 dernières semaines)
+  const zsec = new Array(7).fill(0);
+  if (ftp) for (const r of cur) for (const [b, c] of r.d.ph) zsec[Rider.powerZone(b * 10 + 5, ftp)] += c;
+  const ztot = zsec.reduce((a, b) => a + b, 0);
+  // côtes (90 jours)
+  const climbs = []; r90.forEach(r => (r.d.climbs || []).forEach(c => climbs.push({ ...c, ride: r.name, date: r.date, id: r.id, vam: c.gain / c.t * 3600, wkg: c.w / weight })));
+  const decs = within(det, 0, 90).filter(r => r.d.dec != null && r.time > 7200).map(r => r.d.dec);
+  const longRides = within(rides, 0, 60).filter(r => r.time > 5400).map(r => r.time / 60);
+  const ifs = within(rides, 0, 60).filter(r => r.devW && r.npW && ftp).map(r => r.npW / ftp);
+  return {
+    now, det, ftp, ftpAuto, weight, mass, hrmax, cp, wp, k, cda, nK: ks.length, nCda: cdas.length, series, last, ctl28, weeks, zsec, ztot, climbs, decs, longRides, ifs,
+    curve: { cur: WIN.map(w => best(cur, w)), prev: WIN.map(w => best(prev, w)) }, nDet: det.length, nRides: rides.length, tssOf
+  };
+}
+
+/* =====================================================================
+   Conseils
+   ===================================================================== */
+function advise(m) {
+  const out = [], add = (sev, title, text) => out.push({ sev, title, text });
+  const sp = (extraW, g, P) => Rider.solveSpeed(P + extraW, m.mass, m.cda || .36, .0045, g, 0) * 3.6 - Rider.solveSpeed(P, m.mass, m.cda || .36, .0045, g, 0) * 3.6;
+  if (!m.ftp) { add('warn', 'Pas encore de FTP', 'Aucune sortie avec capteur de puissance analysée en détail. Synchronise tes sorties (et clique « Analyser plus ») ou saisis ton FTP à la main.'); return out; }
+  const wkg = m.ftp / m.weight;
+  add('info', `Ton niveau : FTP ${m.ftp} W · ${wkg.toFixed(2)} W/kg`, wkg < 2.2 ? 'Niveau débutant à loisir : la marge de progression est grande avec de la régularité (3 à 4 sorties par semaine).' : wkg < 3.2 ? 'Bon niveau cyclosportif. Les gains viennent maintenant de la structure des séances (seuil, VO₂max) et de la régularité.' : wkg < 4.2 ? 'Très bon niveau. Il faut un entraînement structuré et assez de récupération pour progresser encore.' : 'Niveau élite : les gains sont fins (récupération, nutrition, spécificité).');
+  const p10 = sp(10, 0, Math.round(m.ftp * .72)), c10 = sp(10, .06, Math.round(m.ftp * .72));
+  add('info', 'Combien vaut +10 W ?', `À 72 % de ton FTP, +10 W soutenus ≈ <b>+${p10.toFixed(1)} km/h sur le plat</b> et <b>+${c10.toFixed(1)} km/h dans une côte à 6 %</b>. La puissance paie beaucoup plus en montée qu'à plat, où l'aérodynamisme compte davantage.`);
+  if (m.nDet < 8) add('warn', 'Peu de sorties analysées', `Seulement ${m.nDet} sortie(s) détaillée(s). Plus tu en analyses (bouton « Analyser plus de sorties »), plus le calibrage et les conseils deviennent fiables.`);
+  // aéro
+  if (m.cda) {
+    const gain = sp(0, 0, Math.round(m.ftp * .72)) * 0 + (Rider.solveSpeed(m.ftp * .72, m.mass, m.cda - .03, .0045, 0, 0) - Rider.solveSpeed(m.ftp * .72, m.mass, m.cda, .0045, 0, 0)) * 3.6;
+    if (m.cda > .4) add('warn', `Aérodynamisme : CdA estimé ${m.cda.toFixed(2)} m²`, `C'est élevé (≈ 0,32–0,38 sur route en bonne position). Gagner 0,03 m² (position plus basse, casque, vêtements ajustés, prolongateurs) = <b>+${gain.toFixed(1)} km/h à puissance égale</b> sur le plat — sans un watt de plus. (Estimation bruitée par le vent.)`);
+    else add('good', `Aérodynamisme correct : CdA ≈ ${m.cda.toFixed(2)} m²`, `Il reste ≈ +${gain.toFixed(1)} km/h à puissance égale par 0,03 m² gagné (position, matériel). Estimation bruitée par le vent.`);
+  }
+  // répartition de l'intensité
+  if (m.ztot > 3600 * 5) {
+    const sh = m.zsec.map(s => s / m.ztot), low = sh[0] + sh[1], mid = sh[2] + sh[3], high = sh[4] + sh[5] + sh[6];
+    if (low < .55) add('warn', 'Trop de temps en zone moyenne/forte', `Sur 6 semaines, seulement ${Math.round(low * 100)} % de ton temps de pédalage est en endurance (Z1–Z2). Vise ≈ 70–80 % : des sorties vraiment faciles permettent de mieux encaisser les séances dures.`);
+    else if (low > .88 && high < .04) add('warn', 'Manque d\'intensité', `${Math.round(low * 100)} % de ton temps est en endurance et presque rien au-dessus du seuil. Ajoute 1 séance de VO₂max (ex. 5 × 4 min à 112–118 % FTP) pour faire monter ton FTP et ta vitesse.`);
+    else add('good', 'Bonne répartition de l\'intensité', `${Math.round(low * 100)} % en endurance, ${Math.round(mid * 100)} % tempo/seuil, ${Math.round(high * 100)} % VO₂max et plus : un équilibre sain.`);
+    if (mid < .1 && low > .6) add('info', 'Peu de travail au seuil', 'Le seuil (Z4) est le levier le plus direct pour la vitesse moyenne sur longue distance. Essaie 2 × 20 min à 90–95 % du FTP une fois par semaine.');
+  }
+  if (m.ifs.length >= 6) {
+    const mean = m.ifs.reduce((a, b) => a + b, 0) / m.ifs.length, sd = Math.sqrt(m.ifs.reduce((a, b) => a + (b - mean) ** 2, 0) / m.ifs.length);
+    if (sd < .07) add('info', 'Sorties trop uniformes', `Toutes tes sorties se ressemblent (intensité moyenne ${(mean * 100).toFixed(0)} % du FTP). Alterne vraiment : jours faciles très faciles, jours durs vraiment durs.`);
+  }
+  // charge
+  if (m.ctl28 != null) {
+    const ramp = (m.last.ctl - m.ctl28) / 4;
+    if (ramp > 8) add('warn', 'Montée en charge rapide', `Ta forme (CTL) monte de ${ramp.toFixed(1)} points par semaine : au-delà de ≈ 6–8, le risque de fatigue ou de blessure augmente. Insère une semaine plus légère.`);
+    else if (ramp < -3 && m.last.ctl > 20) add('info', 'Charge en baisse', `Ta forme baisse (${ramp.toFixed(1)} pt/semaine). Si ce n'est pas voulu, reprends un rythme régulier.`);
+  }
+  if (m.last.tsb < -30) add('warn', `Fatigue élevée (TSB ${m.last.tsb.toFixed(0)})`, 'Tu cumules beaucoup de fatigue : prévois 2–3 jours très faciles ou du repos avant la prochaine séance dure.');
+  else if (m.last.tsb > 15) add('good', `Tu es frais (TSB +${m.last.tsb.toFixed(0)})`, 'Bon moment pour un objectif, un test de FTP (20 min à fond) ou une sortie ambitieuse.');
+  // endurance / dérive
+  if (m.decs.length >= 2) {
+    const dec = median(m.decs);
+    if (dec > 5) add('warn', `Dérive cardiaque ${dec.toFixed(1)} %`, 'Sur tes longues sorties, ton rapport puissance/cardio se dégrade nettement en 2ᵉ moitié : travaille l\'endurance de base (sorties longues en Z2) et soigne nutrition/hydratation.');
+    else add('good', `Bonne endurance (dérive ${dec.toFixed(1)} %)`, 'Ton rapport puissance/cardio reste stable sur les longues sorties.');
+  }
+  // côtes
+  const long = m.climbs.filter(c => c.t >= 180);
+  if (long.length >= 3) {
+    const rel = median(long.map(c => c.w)) / m.ftp, vam = median(long.map(c => c.vam));
+    add(rel < .85 ? 'warn' : 'info', `Dans les côtes : VAM médiane ${Math.round(vam)} m/h · ${(rel * 100).toFixed(0)} % du FTP`, rel < .85 ? 'Tu montes nettement sous ton seuil : tu as de la marge. Essaie des répétitions en côte (4 × 6 min à 92–98 % FTP, cadence 60–80 tr/min) pour monter plus vite sans exploser.' : 'Tu montes près de ton seuil. Pour aller plus vite, il faut d\'abord augmenter ton FTP (séances seuil/VO₂max) ou perdre du poids utile (chaque kg en moins ≈ +1 % de vitesse en montée).');
+  }
+  if (m.k) add('info', `Calibrage du modèle : ×${m.k.toFixed(2)}`, `Sur ${m.nK} sorties, ton temps réel diffère du modèle de ce facteur (arrêts, vent, route…). Le planificateur l'applique pour estimer tes temps.`);
+  return out;
+}
+
+/* =====================================================================
+   Plan des 7 jours
+   ===================================================================== */
+function buildPlan(m) {
+  if (!m.ftp) return null;
+  const F = m.ftp, W = (a, b) => [Math.round(F * a), Math.round(F * b)], H = (a, b) => [Math.round(m.hrmax * a), Math.round(m.hrmax * b)];
+  const tss = (min, i) => Math.round(min / 60 * i * i * 100);
+  const sh = m.ztot ? m.zsec.map(s => s / m.ztot) : null, high = sh ? sh[4] + sh[5] + sh[6] : 0, mid = sh ? sh[2] + sh[3] : 0;
+  const long = clamp(Math.round((median(m.longRides) || 120) * 1.1 / 10) * 10, 120, 240);
+  const rest = { t: 'Repos', c: '#64748b', title: 'Repos', desc: 'Repos complet ou marche. La progression se fait pendant la récupération.', min: 0, tss: 0 };
+  const S_ = (t, c, title, min, ratio, pw, hr, desc) => ({ t, c, title, min, tss: tss(min, ratio), pw: W(...pw), hr: H(...hr), desc });
+  const endu = S_('Endurance', '#38bdf8', 'Endurance', 90, .65, [.56, .75], [.6, .7], 'Roule facile, à la respiration nasale. Parcours plat à vallonné.');
+  const easy = S_('Récup', '#94a3b8', 'Sortie de récupération', 60, .55, [.4, .55], [.5, .6], 'Très souple, cadence élevée, sans forcer.');
+  const longR = S_('Longue', '#4ade80', 'Sortie longue', long, .68, [.56, .78], [.6, .75], 'Allure régulière, mange et bois toutes les 20–30 min. Parcours avec quelques côtes.');
+  let key;
+  if (high < .05) key = S_('VO₂max', '#fb923c', 'VO₂max : 5 × 4 min', 75, .85, [1.12, 1.18], [.9, .97], '15 min d\'échauffement, 5 × 4 min à fond contrôlé (récup 4 min facile), 10 min de retour au calme. Plat ou faible pente.');
+  else if (mid < .12) key = S_('Seuil', '#fbbf24', 'Seuil : 3 × 12 min', 80, .88, [.95, 1.02], [.85, .92], '15 min d\'échauffement, 3 × 12 min à puissance régulière (récup 5 min), retour au calme.');
+  else key = S_('Sweet spot', '#fbbf24', 'Sweet spot : 2 × 20 min', 85, .88, [.88, .93], [.8, .88], '15 min d\'échauffement, 2 × 20 min soutenues (récup 5 min), retour au calme.');
+  const hills = S_('Côtes', '#f472b6', 'Répétitions en côte : 4 × 6 min', 80, .86, [.92, .98], [.85, .93], 'Côte de 5 à 7 %, cadence 60–80 tr/min, assis. Redescends en roue libre entre les répétitions. (Utilise le planificateur pour trouver une côte.)');
+  const test = S_('Test', '#a78bfa', 'Test de FTP (20 min)', 75, .9, [1.0, 1.08], [.88, .95], 'Échauffement 20 min, 20 min à fond régulier : ta moyenne × 0,95 ≈ ton FTP. Frais requis.');
+  let week, label;
+  if (m.last.tsb < -25) { week = [easy, rest, endu, rest, easy, { ...endu, min: 120, title: 'Endurance longue modérée', tss: tss(120, .62) }, rest]; label = 'Semaine allégée (fatigue élevée)'; }
+  else if (m.last.tsb > 12 && m.last.ctl > 30) { week = [rest, key, endu, rest, test, longR, easy]; label = 'Semaine de test (tu es frais)'; }
+  else { week = [rest, key, endu, rest, hills, longR, easy]; label = 'Semaine de progression'; }
+  const total = week.reduce((a, d) => a + d.tss, 0), hrs = week.reduce((a, d) => a + d.min, 0) / 60;
+  return { week, label, total, hrs };
+}
+
+/* =====================================================================
+   Rendu
+   ===================================================================== */
+function ctxOf(cv) {
+  const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = +cv.getAttribute('height');
+  cv.width = W * dpr; cv.height = H * dpr; cv.style.height = H + 'px';
+  const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H); c.font = '11px ui-monospace,Consolas,monospace'; c.textBaseline = 'middle';
+  return { c, W, H };
+}
+function grid(c, W, H, pad, lo, hi, n, fmt = v => Math.round(v)) {
+  c.textAlign = 'right';
+  for (let i = 0; i <= n; i++) { const v = lo + (hi - lo) * i / n, y = pad.t + (1 - i / n) * (H - pad.t - pad.b); c.strokeStyle = '#1b2430'; c.beginPath(); c.moveTo(pad.l, y); c.lineTo(W - pad.r, y); c.stroke(); c.fillStyle = '#6b7788'; c.fillText(fmt(v), pad.l - 6, y); }
+}
+function drawLoad(m) {
+  const { c, W, H } = ctxOf($('#cvLoad')), pad = { l: 38, r: 10, t: 10, b: 22 }, ser = m.series.slice(-120);
+  if (ser.length < 2) return;
+  const hi = Math.max(20, ...ser.map(s => Math.max(s.ctl, s.atl))) * 1.15, lo = Math.min(-10, ...ser.map(s => s.tsb)) * 1.15;
+  const x = i => pad.l + i / (ser.length - 1) * (W - pad.l - pad.r), y = v => pad.t + (1 - (v - lo) / (hi - lo)) * (H - pad.t - pad.b);
+  grid(c, W, H, pad, lo, hi, 4);
+  c.strokeStyle = '#33425a'; c.beginPath(); c.moveTo(pad.l, y(0)); c.lineTo(W - pad.r, y(0)); c.stroke();
+  const line = (key, col, wd) => { c.strokeStyle = col; c.lineWidth = wd; c.beginPath(); ser.forEach((s, i) => i ? c.lineTo(x(i), y(s[key])) : c.moveTo(x(i), y(s[key]))); c.stroke(); };
+  c.globalAlpha = .9; line('tsb', '#fb923c', 1.6); c.globalAlpha = 1; line('atl', '#f472b6', 1.8); line('ctl', '#22d3ee', 2.6);
+  c.fillStyle = '#6b7788'; c.textAlign = 'center';
+  [0, .25, .5, .75, 1].forEach(f => { const i = Math.round(f * (ser.length - 1)), d = new Date(ser[i].day * DAY); c.fillText(d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }), x(i), H - 8); });
+  $('#loadTag').textContent = `CTL ${m.last.ctl.toFixed(0)} · ATL ${m.last.atl.toFixed(0)} · TSB ${m.last.tsb >= 0 ? '+' : ''}${m.last.tsb.toFixed(0)}`;
+}
+function drawCurve(m) {
+  const { c, W, H } = ctxOf($('#cvCurve')), pad = { l: 42, r: 12, t: 12, b: 24 };
+  const all = [...m.curve.cur, ...m.curve.prev].filter(v => v > 0); if (!all.length) return;
+  const hi = Math.ceil(Math.max(...all) / 50) * 50 + 20, lo = 0;
+  const lx = Math.log(WIN[0]), rx = Math.log(WIN[WIN.length - 1]), x = w => pad.l + (Math.log(w) - lx) / (rx - lx) * (W - pad.l - pad.r), y = v => pad.t + (1 - v / hi) * (H - pad.t - pad.b);
+  grid(c, W, H, pad, lo, hi, 4);
+  c.textAlign = 'center'; c.fillStyle = '#6b7788'; WIN.forEach(w => { c.fillText(fmtWin(w), x(w), H - 9); });
+  const draw = (arr, col, wd) => { c.strokeStyle = col; c.lineWidth = wd; c.beginPath(); let st = false; arr.forEach((v, i) => { if (v > 0) { st ? c.lineTo(x(WIN[i]), y(v)) : c.moveTo(x(WIN[i]), y(v)); st = true; } }); c.stroke(); c.fillStyle = col; arr.forEach((v, i) => { if (v > 0) { c.beginPath(); c.arc(x(WIN[i]), y(v), 3, 0, 7); c.fill(); } }); };
+  draw(m.curve.prev, '#64748b', 1.8); draw(m.curve.cur, '#f472b6', 2.6);
+  const i20 = WIN.indexOf(1200), a = m.curve.cur[i20], b = m.curve.prev[i20];
+  $('#curveTag').textContent = a && b ? `20 min : ${a} W (${a - b >= 0 ? '+' : ''}${a - b} W)` : a ? `20 min : ${a} W` : '';
+}
+function drawWeek(m) {
+  const { c, W, H } = ctxOf($('#cvWeek')), pad = { l: 38, r: 10, t: 10, b: 36 }, wk = m.weeks;
+  const hi = Math.max(100, ...wk.map(w => w.tss)) * 1.15; grid(c, W, H, pad, 0, hi, 4);
+  const bw = (W - pad.l - pad.r) / wk.length;
+  wk.forEach((w, i) => {
+    const x = pad.l + i * bw + bw * .15, h = w.tss / hi * (H - pad.t - pad.b), y = H - pad.b - h, g = c.createLinearGradient(0, y, 0, H - pad.b);
+    g.addColorStop(0, '#4ade80'); g.addColorStop(1, '#22d3ee'); c.fillStyle = g; c.fillRect(x, y, bw * .7, Math.max(1, h));
+    c.fillStyle = '#6b7788'; c.textAlign = 'center'; c.fillText(new Date(w.s).toLocaleDateString('fr-FR', { day: 'numeric', month: 'numeric' }), x + bw * .35, H - 22); c.fillText(w.hours.toFixed(1) + 'h', x + bw * .35, H - 9);
+  });
+  const rec = wk.slice(-4); $('#weekTag').textContent = `moy. 4 sem. : ${(rec.reduce((a, w) => a + w.hours, 0) / 4).toFixed(1)} h · ${Math.round(rec.reduce((a, w) => a + w.km, 0) / 4)} km`;
+}
+const tile = (label, val, unit, sub, col) => `<div class="tile" style="--t:${col}"><small>${label}</small><b>${val}<i>${unit}</i></b>${sub ? `<em>${sub}</em>` : ''}</div>`;
+
+function render() {
+  M = computeModel(); const m = M, has = m.nRides > 0;
+  $('#demoBanner').hidden = !isDemo;
+  for (const id of ['cardLoad', 'cardCurve', 'cardWeek', 'cardZones', 'cardClimbs', 'cardAdvice', 'cardPlan']) $('#' + id).hidden = !has;
+  $('#cardProfile').hidden = false;                    // profil saisissable à la main même sans sorties synchronisées
+  const connected = !!S.refresh && !isDemo;
+  $('#btnSync').hidden = !connected; $('#btnMore').hidden = !connected; $('#btnLogout').hidden = !connected; $('#btnConnect').textContent = connected ? 'Reconnecter Strava' : 'Se connecter à Strava';
+  $('#connTag').textContent = connected ? `connecté${S.athlete?.firstname ? ' : ' + S.athlete.firstname : ''}` : '';
+  $('#connSetup').hidden = false; $('#cid').value = S.cid || ''; $('#csec').value = S.secret || '';
+  const wkg = m.ftp ? (m.ftp / m.weight).toFixed(2) : '—';
+  $('#tiles').innerHTML = [
+    tile('FTP', m.ftp || '—', 'W', ov.ftp ? 'saisi à la main' : m.ftpAuto ? 'auto : 95 % du meilleur 20 min' : '', '#22d3ee'),
+    tile('Puissance / poids', wkg, 'W/kg', '', '#a78bfa'),
+    tile('Puissance critique', m.cp || '—', 'W', m.wp ? `W′ ≈ ${m.wp} kJ` : '', '#f472b6'),
+    tile('Poids', m.weight, 'kg', ov.weight ? 'saisi' : S.athlete?.weight ? 'Strava' : 'par défaut', '#fb923c'),
+    tile('FC max', m.hrmax, 'bpm', '', '#f43f5e'),
+    tile('Calibrage', m.k ? '×' + m.k.toFixed(2) : '—', '', m.k ? `${m.nK} sorties` : 'pas assez de données', '#4ade80'),
+    tile('CdA estimé', m.cda ? m.cda.toFixed(2) : '—', 'm²', m.cda ? `${m.nCda} points` : '', '#60a5fa'),
+    tile('Sorties analysées', m.nDet, `/ ${m.nRides}`, '', '#fbbf24')
+  ].join('');
+  $('#profTag').textContent = isDemo ? 'démo' : '';
+  $('#ovFtp').value = ov.ftp || ''; $('#ovW').value = ov.weight || ''; $('#ovHr').value = ov.hrmax || '';
+  if (!has) {                                          // profil manuel : FTP / poids / FC max suffisent pour le planificateur
+    if (m.ftp) Rider.save({ ftp: m.ftp, weight: m.weight, mass: Math.round(m.mass * 10) / 10, k: 1, cda: null, hrmax: m.hrmax, cp: null, wp: null, source: 'manuel', updated: Date.now() });
+    return;
+  }
+  drawLoad(m); drawCurve(m); drawWeek(m);
+  // zones
+  if (m.ztot && m.ftp) {
+    $('#zbar').innerHTML = m.zsec.map((s, i) => `<div style="width:${s / m.ztot * 100}%;background:${Rider.POWER_ZONES[i].c}" title="${Rider.POWER_ZONES[i].n}"></div>`).join('');
+    $('#zleg').innerHTML = m.zsec.map((s, i) => `<span><i style="background:${Rider.POWER_ZONES[i].c}"></i>${Rider.POWER_ZONES[i].n.split(' ')[0]} ${Math.round(s / m.ztot * 100)}%</span>`).join('');
+    $('#zTable').innerHTML = '<tr><th>Zone</th><th class="n">Puissance</th><th class="n">Cardio</th><th class="n">Temps (6 sem.)</th></tr>' + Rider.POWER_ZONES.map((z, i) => {
+      const hz = Rider.HR_ZONES[Math.min(4, Math.max(0, i - 1))];
+      return `<tr><td><span class="pill" style="background:${z.c}">${z.n.split(' ')[0]}</span> ${z.n.split(' ').slice(1).join(' ')}</td><td class="n">${Math.round(m.ftp * z.lo)}–${i === 6 ? '∞' : Math.round(m.ftp * z.hi)} W</td><td class="n">${i === 0 ? '< ' + Math.round(m.hrmax * .6) : i === 6 ? '—' : Math.round(m.hrmax * hz.lo) + '–' + Math.round(m.hrmax * hz.hi)} bpm</td><td class="n">${fmtDur(m.zsec[i])}</td></tr>`;
+    }).join('');
+    $('#zoneTag').textContent = `${fmtDur(m.ztot)} pédalées`;
+  } else { $('#zbar').innerHTML = ''; $('#zleg').innerHTML = ''; $('#zTable').innerHTML = '<tr><td class="mut">Analyse détaillée requise (sorties avec capteur de puissance).</td></tr>'; }
+  // côtes
+  const cl = [...m.climbs].sort((a, b) => b.date - a.date).slice(0, 25);
+  $('#climbTag').textContent = m.climbs.length ? `${m.climbs.length} montées sur 90 jours` : '';
+  $('#climbTable').innerHTML = cl.length ? '<tr><th>Date</th><th>Sortie</th><th>Catégorie</th><th class="n">Longueur</th><th class="n">Pente</th><th class="n">D+</th><th class="n">Temps</th><th class="n">Puissance</th><th class="n">W/kg</th><th class="n">VAM</th></tr>' + cl.map(c => {
+    const cat = Rider.climbCat(c.len, c.gain / c.len);
+    return `<tr><td>${new Date(c.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</td><td><a href="https://www.strava.com/activities/${c.id}" target="_blank" rel="noopener">${esc(c.ride)}</a></td><td><span class="pill" style="background:${cat.c}">${cat.n}</span></td><td class="n">${(c.len / 1000).toFixed(1)} km</td><td class="n">${(c.gain / c.len * 100).toFixed(1)} %</td><td class="n">${c.gain} m</td><td class="n">${fmtDur(c.t)}</td><td class="n">${c.w} W</td><td class="n">${c.wkg.toFixed(2)}</td><td class="n">${Math.round(c.vam)}</td></tr>`;
+  }).join('') : '<tr><td class="mut">Aucune montée détectée (besoin de sorties analysées avec altitude).</td></tr>';
+  // conseils
+  const adv = advise(m);
+  $('#advice').innerHTML = adv.map(a => `<div class="find ${a.sev}"><div style="font-size:20px">${a.sev === 'good' ? '✅' : a.sev === 'warn' ? '⚠️' : '💡'}</div><div><b>${a.title}</b><p>${a.text}</p></div></div>`).join('');
+  // plan
+  const plan = buildPlan(m);
+  if (plan) {
+    $('#planTag').textContent = `${plan.label} · ≈ ${plan.hrs.toFixed(1)} h · ${Math.round(plan.total)} TSS`;
+    $('#days').innerHTML = plan.week.map((d, i) => {
+      const day = new Date(Date.now() + (i + 1) * DAY).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' });
+      return `<div class="day" style="--d:${d.c}"><h3><span>${day}</span><span class="k">${d.min ? fmtDur(d.min * 60) : ''}</span></h3><h4>${d.title}</h4>${d.pw ? `<div class="k">${d.pw[0]}–${d.pw[1]} W · ${d.hr[0]}–${d.hr[1]} bpm · ~${d.tss} TSS</div>` : ''}<p>${d.desc}</p></div>`;
+    }).join('');
+  } else { $('#planTag').textContent = ''; $('#days').innerHTML = '<p class="mut">Le plan apparaît dès que ton FTP est connu.</p>'; }
+  // profil partagé avec le planificateur
+  if (m.ftp) Rider.save({ ftp: m.ftp, weight: m.weight, mass: Math.round(m.mass * 10) / 10, k: m.k || 1, cda: m.cda || null, hrmax: m.hrmax, cp: m.cp, wp: m.wp, source: isDemo ? 'demo' : 'strava', updated: Date.now() });
+}
+const refresh = () => { try { render(); } catch (e) { console.error(e); setStatus('Erreur d\'affichage : ' + e.message, true); } };
+
+/* =====================================================================
+   Démo : sorties synthétiques passées dans la même chaîne d'analyse
+   ===================================================================== */
+function demoRide(seed, ftp, weight, daysAgo) {
+  let s = seed >>> 0; const rnd = () => { s = (s + 0x6D2B79F5) >>> 0; let t = s; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+  const km = 30 + rnd() * 80, L = Math.round(km * 1000 / 20), mass = weight + 9;
+  const level = [.62, .7, .75, .8, .9][seed % 5], climbAt = Math.floor(L * (.2 + rnd() * .5)), climbLen = Math.floor(3000 / 20 + rnd() * 4000 / 20), climbG = .05 + rnd() * .035;
+  const grade = i => .018 * Math.sin(i / (60 + seed % 40)) + .012 * Math.sin(i / 23 + seed) + (i >= climbAt && i < climbAt + climbLen ? climbG : 0) - (i >= climbAt + climbLen && i < climbAt + climbLen * 1.6 ? climbG * .8 : 0);
+  const time = [], dist = [], alt = [], watts = [], hr = [], vel = []; let d = 0, t = 0, z = 120, v = 6, hrn = 80, fat = 0;
+  while (d < km * 1000) {
+    const i = Math.min(L - 1, Math.floor(d / 20)), g = grade(i), P0 = ftp * level * (1 - fat), coast = g < -.025;
+    const P = coast ? 0 : Math.max(0, P0 * (1 + (rnd() - .5) * .25));
+    const tv = P > 0 ? Rider.solveSpeed(P, mass, .36, .0045, g, 0) : Rider.solveSpeed(1, mass, .36, .0045, Math.min(g, -.02), 0);
+    v += (tv - v) * .25; d += v; z += g * v; t++; fat = Math.min(.1, t / 3600 * .02);
+    hrn += ((60 + (P / ftp) * 118 + t / 3600 * 5) - hrn) * .03;
+    time.push(t); dist.push(d); alt.push(z + (rnd() - .5) * 1.2); watts.push(Math.round(P)); hr.push(Math.round(hrn)); vel.push(v);
+  }
+  return { time: { data: time }, distance: { data: dist }, altitude: { data: alt }, watts: { data: watts }, heartrate: { data: hr }, velocity_smooth: { data: vel } };
+}
+function loadDemo() {
+  const out = []; let id = 9000;
+  for (let i = 0; i < 40; i++) {
+    const daysAgo = 2 + i * 2 + (i % 3), ftp = 228 + (40 - i) * .6, st = demoRide(i + 11, ftp, 74, daysAgo), d = summarize(st), T = st.time.data.length, hrs = st.heartrate.data;
+    const dist = st.distance.data[T - 1];
+    out.push({ id: id++, name: ['Sortie matinale', 'Boucle des crêtes', 'Sortie longue', 'Tempo', 'Côtes', 'Récup'][i % 6], date: Date.now() - daysAgo * DAY - 8 * 3600e3, type: 'Ride', dist, time: d.movT,
+      gain: Math.round(st.altitude.data.reduce((a, z, k, arr) => a + (k && z > arr[k - 1] ? z - arr[k - 1] : 0), 0) * .6), avgW: d.pedalW, npW: d.np, devW: true, avgHR: Math.round(hrs.reduce((a, b) => a + b, 0) / T), maxHR: Math.max(...hrs), kj: 0, avgV: dist / T, d });
+  }
+  rides = out.sort((a, b) => b.date - a.date); isDemo = true; store.set('vento.demo', true); persistRides(); ov = {}; store.set('vento.profile', ov);
+  setStatus('Démo chargée : 40 sorties synthétiques analysées par le même moteur que tes vraies données.'); refresh();
+}
+
+/* =====================================================================
+   Événements
+   ===================================================================== */
+$('#btnConnect').onclick = connect;
+$('#btnSync').onclick = syncActivities;
+$('#btnMore').onclick = async () => { try { setBar(0); await detailBatch(25); } catch (e) { setBar(null); setStatus(e.message, true); } refresh(); };
+$('#btnDemo').onclick = () => { setStatus('Génération de la démo…'); setTimeout(loadDemo, 30); };
+$('#btnLogout').onclick = () => { S = {}; store.del('vento.strava'); rides = []; store.del('vento.rides'); Rider.clear(); setStatus('Déconnecté — données locales effacées.'); refresh(); };
+$('#btnClearDemo').onclick = () => { rides = []; isDemo = false; store.del('vento.rides'); store.del('vento.demo'); Rider.clear(); setStatus('Démo effacée.'); refresh(); };
+[['ovFtp', 'ftp'], ['ovW', 'weight'], ['ovHr', 'hrmax']].forEach(([id, k]) => $('#' + id).onchange = e => { const v = parseFloat(e.target.value); if (v > 0) ov[k] = v; else delete ov[k]; store.set('vento.profile', ov); refresh(); });
+let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => M && refresh(), 150); });
+
+handleCallback().then(refresh);
+</script>
+</body>
+</html>
