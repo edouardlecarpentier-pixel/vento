@@ -213,12 +213,21 @@ details.more .search{margin-top:8px}
 .sheet .steps li{margin:4px 0}
 @media (max-width:860px){.modal{align-items:flex-end;padding:0}.sheet{border-radius:18px 18px 0 0;width:100%}}
 
+/* ---------- points personnels & traces importées ---------- */
+.upoi{width:32px;height:32px;border-radius:50%;background:#10151c;border:2px solid var(--c7);display:grid;place-items:center;font-size:17px;box-shadow:0 2px 10px rgba(0,0,0,.55)}
+.wp.dot{width:16px;height:16px;font-size:0;border-width:2px;background:#fff;box-shadow:0 0 0 2px rgba(34,211,238,.6),0 1px 6px rgba(0,0,0,.5)}
+
+/* ---------- choix de l'activité ---------- */
+.seg.sport{margin:0 0 12px}.seg.sport button{flex:1;min-height:44px;font-size:14px}
+.seg.sport button.on{border-color:var(--c5);background:rgba(74,222,128,.15);color:#86efac}
+
 /* ---------- flèches de vent ---------- */
 .windctl{display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-top:6px}
 .windctl .btn{width:44px;height:44px;font-size:21px;padding:0;background:rgba(16,21,28,.95)}
 .windctl .btn.on{background:rgba(34,211,238,.2);border-color:var(--c1)}
 #windInfo{background:rgba(10,14,19,.92);border:1px solid var(--line);border-radius:10px;padding:5px 9px;font:600 12px var(--mono);color:#e6ebf2;white-space:nowrap}
 #windInfo[hidden]{display:none}
+#windInfo.err{color:#fbbf24;border-color:#f59e0b;white-space:normal;max-width:230px;text-align:right;cursor:pointer;font-size:11px}
 .wind-fx{position:absolute;left:0;top:0;pointer-events:none}
 
 /* ---------- côtes & profil ---------- */
@@ -339,12 +348,13 @@ input:focus,select:focus{border-color:var(--a,var(--acc))}
   </nav>
   <div class="brand">
     <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#0a0e13" stroke="#22d3ee" stroke-width="2"/><path d="M12 44c8-2 12-10 20-10s10 8 20 4" fill="none" stroke="#22d3ee" stroke-width="4" stroke-linecap="round"/><path d="M14 24h22a6 6 0 1 0-6-6M14 31h30a6 6 0 1 1-6 6" fill="none" stroke="#e6ebf2" stroke-width="3" stroke-linecap="round" opacity=".85"/></svg>
-    <div><b>VENTO</b><small>Planificateur vélo · vent · points d'intérêt</small></div>
+    <div><b>VENTO</b><small>Vélo · course · marche · vent · points d'intérêt</small></div>
     <a class="btn sm" href="training.html" style="margin-left:auto;text-decoration:none">🏋️ Entraînement</a>
   </div>
 
   <section class="card">
     <h2><span><span class="ic">🧭</span>Itinéraire</span></h2>
+    <div class="seg sport" id="sportSeg" role="tablist" aria-label="Activité"><button data-sport="bike">🚴 Vélo</button><button data-sport="run">🏃 Course</button><button data-sport="walk">🚶 Marche</button></div>
     <div class="da">
       <div class="dafield"><span class="dot s">D</span><input id="qStart" type="text" placeholder="Départ : adresse, lieu… (Entrée)" autocomplete="off" enterkeyhint="search">
         <button class="btn sm" data-pick="start" title="Choisir le départ sur la carte">📍</button><button class="btn sm" data-place="start:home" title="Départ = ma maison">🏠</button><button class="btn sm" data-place="start:work" title="Départ = mon travail">🏢</button></div>
@@ -360,6 +370,7 @@ input:focus,select:focus{border-color:var(--a,var(--acc))}
       </div>
       <div id="results"></div>
     </details>
+    <button class="btn" id="btnSnap" style="width:100%;margin:10px 0 0" hidden title="Pour une trace importée en ligne droite : la recale sur les routes et chemins du mode choisi">🧲 Recaler cette trace sur les routes</button>
     <div class="toolbar">
       <button class="btn" id="btnUndo" title="Revenir en arrière (Ctrl+Z) — autant de fois que tu veux">↶ Retour</button>
       <button class="btn" id="btnRedo" title="Rétablir (Ctrl+Y)">↷ Rétablir</button>
@@ -436,7 +447,13 @@ input:focus,select:focus{border-color:var(--a,var(--acc))}
     <p class="hint" id="hoursHint">Chaque barre = un départ possible (5 h–21 h, 48 h à venir). Plus la barre est haute et bleue, plus le vent t'aide. Clique pour choisir l'heure.</p>
   </section>
 
-  <section class="card">
+  <section class="card" id="cardPace" hidden>
+    <h2><span><span class="ic">⏱️</span>Allure</span> <span class="tag" id="paceTag"></span></h2>
+    <label class="f"><span id="paceLabel">Allure de course (min/km)</span><input id="pace" type="text" inputmode="decimal" placeholder="6:00" autocomplete="off" autocapitalize="off"></label>
+    <p class="hint">La durée utilise l'allure choisie, ajustée à la pente et au vent à l'heure de passage (modèle de coût énergétique de la course / marche). Les cartes, le vent, le dénivelé, les points d'intérêt et l'export GPX fonctionnent comme pour le vélo.</p>
+  </section>
+
+  <section class="card" id="cardRider">
     <h2><span><span class="ic">🚴</span>Cycliste</span> <a class="tag" href="training.html">🏋️ Entraînement &amp; Strava →</a></h2>
     <div id="profBox" hidden>
       <label class="check"><input type="checkbox" id="useProfile"> Utiliser mon profil (Strava)</label>
@@ -456,6 +473,13 @@ input:focus,select:focus{border-color:var(--a,var(--acc))}
       </select>
     </label>
     <p class="hint">Durée calculée segment par segment (puissance constante, pente, résistance de l'air, vent réel à l'heure de passage). Vent à 1,5 m du sol ≈ 70 % du vent à 10 m.</p>
+  </section>
+
+  <section class="card" id="cardUpois">
+    <h2><span><span class="ic">📌</span>Mes points</span> <span class="tag" id="upoiTag"></span></h2>
+    <p class="hint" style="margin:0 0 10px">Ajoute tes propres repères (fontaine, ravito, vue, danger…) : ils sont enregistrés avec le parcours et exportés dans le GPX. Astuce : <b>appui long</b> sur la carte (clic droit sur PC).</p>
+    <button class="btn primary" id="btnAddUpoi" style="width:100%">➕ Ajouter un point sur la carte</button>
+    <div id="upoiList" style="margin-top:10px;display:flex;flex-direction:column;gap:2px"></div>
   </section>
 
   <section class="card">
@@ -536,6 +560,17 @@ input:focus,select:focus{border-color:var(--a,var(--acc))}
   <button id="mGpx" class="primary" aria-label="Exporter en GPX">⬇<span>GPX</span></button>
 </nav>
 <div id="toast"></div>
+
+<div id="upoiModal" class="modal" hidden>
+  <div class="sheet" role="dialog" aria-labelledby="upoiTitle">
+    <h3 id="upoiTitle">Nouveau point d'intérêt</h3>
+    <label class="f">Nom<input id="upoiName" type="text" maxlength="60" placeholder="Ex. Fontaine de la place" autocomplete="off"></label>
+    <label class="f">Type<select id="upoiType"></select></label>
+    <button class="btn primary" id="upoiSave">Enregistrer</button>
+    <button class="btn" id="upoiDel">🗑 Supprimer ce point</button>
+    <button class="btn" id="upoiCancel">Annuler</button>
+  </div>
+</div>
 
 <div id="sendModal" class="modal" hidden>
   <div class="sheet" role="dialog" aria-labelledby="sendTitle">
@@ -666,13 +701,13 @@ const OVERPASS = ['https://overpass.openstreetmap.fr/api/interpreter', 'https://
 /* =====================================================================
    État
    ===================================================================== */
-const defaults = { power: 160, mass: 85, bike: 'road', routing: 'fastbike-verylowtraffic', radius: 500, cats: ['water'], poiGpx: false, useProfile: true, effort: 'endurance' };
+const defaults = { power: 160, mass: 85, bike: 'road', routing: 'fastbike-verylowtraffic', radius: 500, cats: ['water'], poiGpx: false, useProfile: true, effort: 'endurance', sport: 'bike', pace: { run: 6, walk: 12 }, routingBy: {} };
 const state = {
   set: { ...defaults, ...store.get('vento.settings', {}) },
   wps: [], loop: false, name: '', history: [],
   route: null, wind: null, ana: null, anaRev: null, best: [],
   startMs: 0, tok: 0, poi: [], poiExcl: new Set(), hover: null, wpDist: [], rider: Rider.load(), pw: null, climbs: [],
-  hasEnd: false, redo: [], labels: {}, pendingEnd: null, pick: null, safeMode: false,
+  hasEnd: false, redo: [], labels: {}, pendingEnd: null, pick: null, safeMode: false, userPois: [],
   places: store.get('vento.places', {}), commute: store.get('vento.commute', { aller: '08:00', retour: '17:30', safe: true }), colorBy: store.get('vento.colorBy', 'wind')
 };
 { const d = new Date(); d.setMinutes(0, 0, 0); state.startMs = d.getTime() + 3600e3; }
@@ -709,7 +744,7 @@ new ResizeObserver(() => { map.invalidateSize(); drawProfile(); }).observe($('#m
 const canvasR = L.canvas({ padding: .3 });
 const G = {
   casing: L.layerGroup().addTo(map), line: L.layerGroup().addTo(map), arrows: L.layerGroup().addTo(map),
-  wind: L.layerGroup().addTo(map), poi: L.layerGroup().addTo(map), wp: L.layerGroup().addTo(map)
+  wind: L.layerGroup().addTo(map), poi: L.layerGroup().addTo(map), upoi: L.layerGroup().addTo(map), wp: L.layerGroup().addTo(map)
 };
 const hoverDot = L.circleMarker([0, 0], { radius: 7, color: '#fff', weight: 2, fillColor: '#22d3ee', fillOpacity: 1, interactive: false });
 
@@ -723,19 +758,20 @@ async function routeBRouter(pts, profile) {
   if (!c || c.length < 2) throw new Error('itinéraire vide');
   return { coords: c.map(p => [p[1], p[0]]), msgs: j.features[0].properties?.messages || null };   // msgs = nature de chaque tronçon (OSM)
 }
-async function routeOSRM(pts) {
+async function routeOSRM(pts, foot = false) {
   const s = pts.map(w => `${w.lng.toFixed(6)},${w.lat.toFixed(6)}`).join(';');
-  const j = await fetchJSON(`https://routing.openstreetmap.de/routed-bike/route/v1/driving/${s}?overview=full&geometries=geojson&steps=false`, {}, 30000);
+  const j = await fetchJSON(`https://routing.openstreetmap.de/routed-${foot ? 'foot' : 'bike'}/route/v1/driving/${s}?overview=full&geometries=geojson&steps=false`, {}, 30000);
   if (j.code !== 'Ok' || !j.routes?.[0]) throw new Error('itinéraire vide');
   return { coords: j.routes[0].geometry.coordinates.map(p => [p[1], p[0]]), msgs: null };
 }
 async function getRoute(pts, profile) {
   const line = () => ({ coords: pts.map(p => [p.lat, p.lng]), msgs: null });
   if (profile === 'line') return line();
-  const tries = [...new Set(profile === 'osrm' ? ['osrm'] : [profile, 'trekking', 'osrm'])];
+  const foot = isFoot();
+  const tries = [...new Set(profile === 'osrm' ? ['osrm'] : profile === 'osrmfoot' ? ['osrmfoot'] : foot ? [profile, 'osrmfoot'] : [profile, 'trekking', 'osrm'])];
   for (const t of tries) {
     try {
-      const r = t === 'osrm' ? await routeOSRM(pts) : await routeBRouter(pts, t);
+      const r = t === 'osrm' ? await routeOSRM(pts) : t === 'osrmfoot' ? await routeOSRM(pts, true) : await routeBRouter(pts, t);
       if (t !== profile) toast(`Profil « ${profile} » indisponible, calcul avec « ${t} »`);
       return r;
     } catch (e) { console.warn('routage', t, e); }
@@ -805,7 +841,24 @@ async function fetchWind(rt) {
    Physique & analyse du vent
    ===================================================================== */
 const solveSpeed = Rider.solveSpeed;                       // m/s, vw = vent de face (m/s) — voir rider.js
-const activeProfile = () => (state.set.useProfile !== false && state.rider?.ftp) ? state.rider : null;
+const isFoot = () => state.set.sport === 'run' || state.set.sport === 'walk';
+const activeProfile = () => (!isFoot() && state.set.useProfile !== false && state.rider?.ftp) ? state.rider : null;
+/* ---- course à pied / marche : allure choisie ajustée à la pente (coût énergétique de Minetti / fonction de Tobler) et au vent ---- */
+const defaultPace = sport => sport === 'walk' ? 12 : 6;                                  // min/km
+const paceOf = sport => +(state.set.pace?.[sport]) || defaultPace(sport);
+function parsePace(s) {                                                                 // « 5:30 », « 5.5 », « 5'30 » -> minutes par km
+  const m = String(s).trim().replace(/[’']/g, ':').replace(',', '.').match(/^(\d{1,2})(?::(\d{1,2}))?(?:\.(\d+))?$/);
+  if (!m) return null; const v = m[2] != null ? +m[1] + (+m[2]) / 60 : +(m[1] + (m[3] ? '.' + m[3] : ''));
+  return v >= 2.5 && v <= 30 ? v : null;
+}
+const fmtPace = min => { const t = Math.round(min * 60); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
+function footSpeed(sport, base, grade, head) {                                           // km/h
+  const g = clamp(grade, -.3, .3); let f;
+  if (sport === 'walk') { const t = x => Math.exp(-3.5 * Math.abs(x + .05)); f = t(g) / t(0); }
+  else { const C = x => 155.4 * x ** 5 - 30.4 * x ** 4 - 43.3 * x ** 3 + 46.3 * x ** 2 + 19.5 * x + 3.6; f = clamp(C(0) / C(g), .3, 1.3); }
+  f *= 1 - clamp(head, -25, 35) * (sport === 'run' ? .0045 : .0025);
+  return base * Math.max(.2, f);
+}
 function computePower(rt) {                                // puissance tenable selon l'effort visé et la durée
   const pr = activeProfile(); if (!pr) { state.pw = state.set.power; return; }
   let P = Rider.targetPower(pr.ftp, state.set.effort, 3 * 3600);
@@ -823,6 +876,7 @@ function windAt(W, rt, midD, t) {
 }
 function analyze(rt, startMs, fwd = true) {
   const { pts, cum, ele, n, step } = rt.rs, W = state.wind, S = state.set, bk = BIKES[S.bike] || BIKES.road;
+  const foot = isFoot(), fbase = 60 / paceOf(S.sport);                      // km/h à plat pour la marche / course
   const pr = activeProfile(), P = pr ? (state.pw ?? S.power) : S.power, mass = pr ? pr.mass : S.mass, kk = pr ? (pr.k || 1) : 1;
   let t = startMs, dTrav = 0, sec = 0, sec0 = 0, wsLen = 0, ux = 0, uy = 0, headSum = 0, gustMax = 0, tempSum = 0, popMax = 0, len = 0, outOfRange = false;
   const segs = [], byI = new Array(n - 1).fill(null), cls = [0, 0, 0, 0, 0];
@@ -835,8 +889,8 @@ function analyze(rt, startMs, fwd = true) {
     const w = W ? windAt(W, rt, midD, t) : null;
     let head = 0, cross = 0, ws = 0, wd = 0;
     if (w) { ws = w.ws; wd = w.wd; const r = rad(wd - brg); head = ws * Math.cos(r); cross = ws * Math.sin(r); if (w.beyond || w.before) outOfRange = true; }
-    const v = solveSpeed(P, mass, bk.cda, bk.crr, grade, head / 3.6 * WIND_FACTOR);
-    const v0 = solveSpeed(P, mass, bk.cda, bk.crr, grade, 0);
+    const v = foot ? footSpeed(S.sport, fbase, grade, head) / 3.6 : solveSpeed(P, mass, bk.cda, bk.crr, grade, head / 3.6 * WIND_FACTOR);
+    const v0 = foot ? footSpeed(S.sport, fbase, grade, 0) / 3.6 : solveSpeed(P, mass, bk.cda, bk.crr, grade, 0);
     const dt = l / v * kk; sec += dt; sec0 += l / v0 * kk;
     const seg = { i, d0: dTrav, len: l, brg, grade, head, cross, ws, wd, v: v * 3.6 / kk, dt, t, cls: windClass(head) };
     segs.push(seg); byI[i] = seg; cls[seg.cls] += l;
@@ -920,7 +974,8 @@ function elevationStats(rt) {
 /* =====================================================================
    Rendu
    ===================================================================== */
-function renderAll() { renderRoute(); renderStats(); renderWind(); renderHours(); renderClimbs(); renderSafety(); renderCommute(); syncDA(); rebuildPOI(); drawProfile(); syncRider(); if (typeof WindFx !== 'undefined') WindFx.hourChanged(); }
+function renderAll() { renderRoute(); renderStats(); renderWind(); renderHours(); renderClimbs(); renderSafety(); renderCommute(); syncDA(); rebuildPOI(); drawProfile(); syncRider(); if (typeof WindFx !== 'undefined') WindFx.hourChanged();
+  $('#btnSnap').hidden = !(state.set.routing === 'line' && state.wps.length >= 2); }
 
 function syncRider() {                                     // reflète le profil Strava (training.html) dans le panneau « Cycliste »
   state.rider = Rider.load(); const r = state.rider, has = !!r?.ftp, on = !!activeProfile();
@@ -947,18 +1002,20 @@ function renderClimbs() {
   });
   const cl = state.climbs;
   el.innerHTML = cl.length ? `<div class="climbhead">⛰️ ${cl.length} côte${cl.length > 1 ? 's' : ''} sur le parcours</div>` + cl.map((c, i) =>
-    `<div class="climb" data-i="${i}"><span class="pill" style="background:${c.cat.c}">${c.cat.n}</span><span class="mono">km ${(c.d0 / 1000).toFixed(1)}</span><span>${(c.len / 1000).toFixed(1)} km · <b>${(c.grade * 100).toFixed(1)} %</b> · +${Math.round(c.gain)} m</span>${ana ? `<span class="mono climbt">${fmtDur(c.t)} · ${Math.round(P)} W · ${Math.round(c.vam)} m/h</span>` : ''}</div>`).join('') : '<div class="climbhead mut">Aucune côte significative (≥ 3 % sur plus de 500 m).</div>';
+    `<div class="climb" data-i="${i}"><span class="pill" style="background:${c.cat.c}">${c.cat.n}</span><span class="mono">km ${(c.d0 / 1000).toFixed(1)}</span><span>${(c.len / 1000).toFixed(1)} km · <b>${(c.grade * 100).toFixed(1)} %</b> · +${Math.round(c.gain)} m</span>${ana ? `<span class="mono climbt">${fmtDur(c.t)}${isFoot() ? '' : ' · ' + Math.round(P) + ' W'} · ${Math.round(c.vam)} m/h</span>` : ''}</div>`).join('') : '<div class="climbhead mut">Aucune côte significative (≥ 3 % sur plus de 500 m).</div>';
   el.querySelectorAll('.climb').forEach(r => r.onclick = () => { const c = cl[+r.dataset.i]; map.setView(rt.rs.pts[Math.round((c.i0 + c.i1) / 2)], Math.max(map.getZoom(), 13)); });
 }
 
 function renderWaypoints() {
   G.wp.clearLayers();
-  if (state.wps.length > 40) return;
-  state.wps.forEach((w, i) => {
-    const last = i === state.wps.length - 1 && state.wps.length > 1 && !state.loop;
+  const big = state.wps.length > 40;                       // trace importée : petits points déplaçables, seulement ceux visibles à fort zoom
+  let idx = state.wps.map((_, i) => i);
+  if (big) { if (map.getZoom() < 13) return; const b = map.getBounds().pad(.1); idx = idx.filter(i => b.contains([state.wps[i].lat, state.wps[i].lng])).slice(0, 150); }
+  idx.forEach(i => {
+    const w = state.wps[i], last = i === state.wps.length - 1 && state.wps.length > 1 && !state.loop, dot = big && i !== 0 && !last;
     const cls = i === 0 ? 'start' : last ? 'end' : '';
     const label = i === 0 ? 'D' : last ? 'A' : i;
-    const m = L.marker([w.lat, w.lng], { draggable: true, icon: L.divIcon({ className: '', html: `<div class="wp ${cls}">${label}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] }), zIndexOffset: 1000 });
+    const m = L.marker([w.lat, w.lng], { draggable: true, icon: dot ? L.divIcon({ className: '', html: '<div class="wp dot"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }) : L.divIcon({ className: '', html: `<div class="wp ${cls}">${label}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] }), zIndexOffset: 1000 });
     m.on('dragend', () => { pushHistory(); const p = m.getLatLng(); state.wps[i] = { lat: p.lat, lng: p.lng }; scheduleRecompute(80); });
     m.bindPopup(() => {
       const el = document.createElement('div'); el.className = 'pop';
@@ -1074,7 +1131,7 @@ function renderStats() {
   let up = null, down = null, max = null;
   if (rt.rs.hasEle) { const e = elevationStats(rt); up = Math.round(e.up); down = Math.round(e.down); max = Math.round(e.max); }
   set('#tUp', up, 'm'); set('#tDown', down, 'm'); set('#tMax', max, 'm');
-  if (ana) { set('#tTime', fmtDur(ana.sec), ''); set('#tSpeed', (rt.total / ana.sec * 3.6).toFixed(1), 'km/h'); }
+  if (ana) { set('#tTime', fmtDur(ana.sec), ''); if (isFoot()) set('#tSpeed', fmtPace(ana.sec / 60 / (rt.total / 1000)), 'min/km'); else set('#tSpeed', (rt.total / ana.sec * 3.6).toFixed(1), 'km/h'); }
   else { set('#tTime', null); set('#tSpeed', null); }
   $('#fabSum').innerHTML = `${fmtKm(rt.total)} km${up != null ? ` <i>·</i> D+ ${up} m` : ''}${ana ? ` <i>·</i> ${fmtDur(ana.sec)}` : ''}`;
 }
@@ -1355,7 +1412,7 @@ function gpxElevAt(rt, d) {
 }
 function buildGPX() {
   const rt = state.route; if (!rt) return null;
-  const name = state.name.trim() || `Parcours ${new Date().toLocaleDateString('fr-FR')}`;
+  const name = state.name.trim() || `${{ bike: 'Parcours vélo', run: 'Course', walk: 'Marche' }[state.set.sport] || 'Parcours'} ${new Date().toLocaleDateString('fr-FR')}`;
   let pts = rt.raw.map((p, i) => [p[0], p[1], rt.rs.hasEle ? gpxElevAt(rt, rt.cum[i]) : null]);
   let tol = 2; while (pts.length > 4000 && tol < 40) { pts = simplifyDP(pts, tol); tol *= 2; }
   const ana = state.ana, e = rt.rs.hasEle ? elevationStats(rt) : null;
@@ -1363,12 +1420,16 @@ function buildGPX() {
     ana?.hasWind ? `vent moyen ${Math.round(ana.avgWs)} km/h du ${cardinal(ana.avgWd)} (${ana.avgHead >= 0 ? 'face' : 'dos'} ${Math.abs(ana.avgHead).toFixed(1)} km/h)` : ''].filter(Boolean).join(' · ');
   let x = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Vento" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">\n`;
   x += `<metadata><name>${esc(name)}</name><desc>${esc(desc)}</desc><time>${new Date().toISOString()}</time></metadata>\n`;
+  for (const p of state.userPois) {                          // tes points d'intérêt : toujours exportés
+    const t = UPOI[p.type] || UPOI.other;
+    x += `<wpt lat="${p.lat.toFixed(6)}" lon="${p.lng.toFixed(6)}"><name>${esc(p.name || t.l)}</name><desc>${esc(t.l)}</desc><sym>${esc(t.sym)}</sym></wpt>\n`;
+  }
   if ($('#poiGpx').checked)
     for (const p of state.poi) {
       if (state.poiExcl.has(p.key)) continue;
       x += `<wpt lat="${p.lat.toFixed(6)}" lon="${p.lng.toFixed(6)}"><name>${esc(p.name || p.cat.label)}</name><desc>${esc(p.cat.label)}</desc><sym>${esc(p.cat.sym)}</sym></wpt>\n`;
     }
-  x += `<trk><name>${esc(name)}</name><desc>${esc(desc)}</desc><trkseg>\n`;
+  x += `<trk><name>${esc(name)}</name><desc>${esc(desc)}</desc><type>${{ bike: 'cycling', run: 'running', walk: 'walking' }[state.set.sport] || 'cycling'}</type><trkseg>\n`;
   for (const p of pts) x += `<trkpt lat="${p[0].toFixed(6)}" lon="${p[1].toFixed(6)}">${p[2] != null ? `<ele>${p[2].toFixed(1)}</ele>` : ''}</trkpt>\n`;
   return { xml: x + '</trkseg></trk>\n</gpx>\n', name, count: pts.length };
 }
@@ -1409,14 +1470,30 @@ function importGPX(text) {
   if (doc.querySelector('parsererror')) return toast('Fichier GPX illisible');
   let nodes = [...doc.getElementsByTagName('trkpt')];
   if (!nodes.length) nodes = [...doc.getElementsByTagName('rtept')];
-  let pts = nodes.map(n => [parseFloat(n.getAttribute('lat')), parseFloat(n.getAttribute('lon'))]).filter(p => isFinite(p[0]) && isFinite(p[1]));
+  const pts = nodes.map(n => [parseFloat(n.getAttribute('lat')), parseFloat(n.getAttribute('lon'))]).filter(p => isFinite(p[0]) && isFinite(p[1]));
   if (pts.length < 2) return toast('Aucune trace trouvée dans ce GPX');
-  let tol = 8, s = simplifyDP(pts, tol); while (s.length > 300 && tol < 400) { tol *= 1.5; s = simplifyDP(pts, tol); }
-  pushHistory(); state.loop = false; state.wps = s.map(p => ({ lat: p[0], lng: p[1] }));
+  let tol = 6, s = simplifyDP(pts, tol); while (s.length > 250 && tol < 400) { tol *= 1.4; s = simplifyDP(pts, tol); }
+  pushHistory(); state.loop = false; state.hasEnd = false; state.labels = {};
+  const typ = (doc.querySelector('trk > type')?.textContent || '').toLowerCase();                 // course / marche / vélo reconnus
+  if (/run/.test(typ)) setSport('run', { reroute: false }); else if (/walk|hik/.test(typ)) setSport('walk', { reroute: false }); else if (/cycl|bik|ride/.test(typ)) setSport('bike', { reroute: false });
+  state.wps = s.map(p => ({ lat: p[0], lng: p[1] }));
   state.set.routing = 'line'; $('#routing').value = 'line';
   const nm = doc.querySelector('trk > name, metadata > name, rte > name'); state.name = nm?.textContent?.trim() || 'Parcours importé'; $('#name').value = state.name;
-  syncButtons(); map.fitBounds(L.latLngBounds(pts), { padding: [60, 60] }); scheduleRecompute(50);
-  toast(`GPX importé (${pts.length} → ${s.length} points, ligne droite entre eux)`);
+  state.userPois = [...doc.getElementsByTagName('wpt')].slice(0, 100).map(w => {                   // points d'intérêt du fichier -> modifiables
+    const g = t => w.getElementsByTagName(t)[0]?.textContent || '', label = `${g('name')} ${g('sym')} ${g('desc')}`.toLowerCase();
+    const type = /eau|water|fontaine|spring/.test(label) ? 'water' : /caf|restau|ravit|boulang|food/.test(label) ? 'cafe' : /wc|toilet|restroom/.test(label) ? 'wc' : /vue|view|scenic|photo|summit|col/.test(label) ? 'photo' : /danger|attention|warn/.test(label) ? 'danger' : /flag|rep[eè]re/.test(label) ? 'flag' : 'other';
+    return { id: 'u' + Math.random().toString(36).slice(2, 8), lat: parseFloat(w.getAttribute('lat')), lng: parseFloat(w.getAttribute('lon')), name: g('name'), type };
+  }).filter(p => isFinite(p.lat) && isFinite(p.lng));
+  renderUserPois(); syncButtons(); map.fitBounds(L.latLngBounds(pts), { padding: [60, 60] }); scheduleRecompute(50);
+  toast(`GPX importé : ${pts.length} points → ${s.length} points modifiables${state.userPois.length ? ` + ${state.userPois.length} point(s) d'intérêt` : ''}. Tire la trace pour la modifier, appui long sur la carte pour ajouter un point.`, 7000);
+}
+function snapToRoads() {                         // recale une trace importée (ligne droite) sur les routes / chemins du mode choisi
+  if (state.wps.length < 2) return toast('Charge ou trace d\'abord un parcours');
+  const ptsAll = state.route ? state.route.raw.map(p => [p[0], p[1]]) : state.wps.map(w => [w.lat, w.lng]);
+  let tol = 20, s = simplifyDP(ptsAll, tol); while (s.length > 35 && tol < 800) { tol *= 1.35; s = simplifyDP(ptsAll, tol); }
+  pushHistory(); state.wps = s.map(p => ({ lat: p[0], lng: p[1] }));
+  state.set.routing = isFoot() ? 'hiking-beta' : 'fastbike-verylowtraffic'; $('#routing').value = state.set.routing;
+  scheduleRecompute(50); toast(`Trace recalée sur les routes (${s.length} points de passage) — le score de sécurité devient disponible.`, 6000);
 }
 function loadSaved() { return store.get('vento.routes', []); }
 function renderSaved() {
@@ -1428,7 +1505,8 @@ function renderSaved() {
   });
 }
 function applyRoute(r) {
-  pushHistory(); state.wps = r.wps; state.loop = !!r.loop; state.name = r.name; $('#name').value = r.name;
+  pushHistory(); if (r.sport && r.sport !== state.set.sport) setSport(r.sport, { reroute: false });
+  state.wps = r.wps; state.loop = !!r.loop; state.name = r.name; $('#name').value = r.name; state.userPois = r.upois || []; renderUserPois();
   state.set.routing = r.routing || 'trekking'; $('#routing').value = state.set.routing; syncButtons();
   if (r.wps.length) map.fitBounds(L.latLngBounds(r.wps.map(w => [w.lat, w.lng])), { padding: [70, 70] });
   scheduleRecompute(50);
@@ -1436,7 +1514,7 @@ function applyRoute(r) {
 function saveRoute() {
   if (!state.route) return;
   const name = state.name.trim() || `Parcours ${new Date().toLocaleDateString('fr-FR')}`;
-  const list = loadSaved(); list.unshift({ id: Date.now().toString(36), name, wps: state.wps, loop: state.loop, routing: state.set.routing, km: (state.route.total / 1000).toFixed(1), date: new Date().toLocaleDateString('fr-FR') });
+  const list = loadSaved(); list.unshift({ id: Date.now().toString(36), name, wps: state.wps, loop: state.loop, routing: state.set.routing, sport: state.set.sport, upois: state.userPois, km: (state.route.total / 1000).toFixed(1), date: new Date().toLocaleDateString('fr-FR') });
   store.set('vento.routes', list.slice(0, 40)); renderSaved(); toast('Parcours sauvegardé dans ce navigateur');
 }
 
@@ -1479,7 +1557,7 @@ function safetyAt(rt, d) {
 function renderSafety() {
   const rt = state.route, el = $('#safety');
   document.querySelectorAll('#colorBy button').forEach(b => b.classList.toggle('on', b.dataset.v === state.colorBy));
-  if (!rt) { el.innerHTML = ''; return; }
+  if (!rt || isFoot()) { el.innerHTML = ''; return; }
   if (!rt.safety) { el.innerHTML = '<p class="hint">Analyse de sécurité disponible avec un routage vélo (BRouter) : choisis « Le plus sûr » dans le type de routage.</p>'; return; }
   const s = rt.safety, tot = s.sum, safe = (s.pct[0] + s.pct[1]) / tot * 100;
   el.innerHTML = `<div class="safebar">${s.pct.map((m, i) => `<div style="width:${m / tot * 100}%;background:${SAFE[i].col}"></div>`).join('')}</div>
@@ -1589,7 +1667,7 @@ function setEnd(pt, label) {
 }
 function startPick(kind) {
   state.pick = kind; map.getContainer().classList.add('picking');
-  toast({ start: 'Clique sur la carte pour placer le DÉPART', end: 'Clique sur la carte pour placer l\'ARRIVÉE', home: 'Clique sur la carte pour placer ta MAISON', work: 'Clique sur la carte pour placer ton TRAVAIL' }[kind] + ' (Échap pour annuler)', 6000);
+  toast({ start: 'Clique sur la carte pour placer le DÉPART', end: 'Clique sur la carte pour placer l\'ARRIVÉE', home: 'Clique sur la carte pour placer ta MAISON', work: 'Clique sur la carte pour placer ton TRAVAIL', poi: 'Touche la carte à l\'endroit du point d\'intérêt' }[kind] + ' (Échap pour annuler)', 6000);
 }
 function endPick() { state.pick = null; map.getContainer().classList.remove('picking'); }
 
@@ -1638,7 +1716,7 @@ function loadCommute(dir) {
   const a = dir === 'aller' ? h : w, b = dir === 'aller' ? w : h;
   pushHistory(); state.loop = false; state.wps = [{ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng }]; state.hasEnd = true;
   state.labels = { start: { lat: a.lat, lng: a.lng, label: a.label }, end: { lat: b.lat, lng: b.lng, label: b.label } };
-  if ($('#commuteSafe').checked) { state.set.routing = 'fastbike-verylowtraffic'; $('#routing').value = state.set.routing; state.colorBy = 'safety'; store.set('vento.colorBy', 'safety'); }
+  if ($('#commuteSafe').checked) { state.set.routing = isFoot() ? 'hiking-beta' : 'fastbike-verylowtraffic'; $('#routing').value = state.set.routing; if (!isFoot()) { state.colorBy = 'safety'; store.set('vento.colorBy', 'safety'); } }
   state.startMs = nextWorkday(dir === 'aller' ? state.commute.aller : state.commute.retour);
   map.fitBounds(L.latLngBounds([[a.lat, a.lng], [b.lat, b.lng]]), { padding: [80, 80] }); scheduleRecompute(50);
 }
@@ -1680,15 +1758,17 @@ function renderCommute() {
    ===================================================================== */
 const WindFx = (() => {
   const cv = L.DomUtil.create('canvas', 'wind-fx'), ctx = cv.getContext('2d');
-  const cache = new Map();                       // "lat,lng|heure" -> { s: km/h, d: ° (d'où vient le vent) }
-  let on = false, raf = 0, parts = [], lattice = null, hourKey = '', timer = 0, tok = 0, avg = null, fallback = false;
+  const cache = new Map();                       // "lat,lng|heure" -> { s: km/h, d: ° (d'où vient le vent), t }
+  let on = false, raf = 0, parts = [], lattice = null, hourKey = '', timer = 0, retry = 0, tok = 0, avg = null, fallback = false, zooming = false, W = 0, H = 0, errMsg = '';
   const mobile = () => matchMedia('(max-width: 860px)').matches;
   const COLORS = [[10, '#bae6fd'], [20, '#22d3ee'], [30, '#a3e635'], [40, '#fbbf24'], [1e9, '#f43f5e']];
   const colorOf = s => COLORS.find(c => s < c[0])[1];
   const hourOf = ms => new Date(ms).toISOString().slice(0, 13) + ':00';
 
-  function place() {
-    const s = map.getSize(); if (cv.width !== s.x || cv.height !== s.y) { cv.width = s.x; cv.height = s.y; }
+  function place() {                              // canvas = taille de la carte, net sur écrans haute densité
+    const s = map.getSize(), dpr = devicePixelRatio || 1; W = s.x; H = s.y;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); cv.style.width = W + 'px'; cv.style.height = H + 'px'; }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     L.DomUtil.setPosition(cv, map.containerPointToLayerPoint([0, 0]));
   }
   /* ---- champ de vent ---- */
@@ -1706,10 +1786,13 @@ const WindFx = (() => {
   async function fetchNodes(nodes, hour) {
     const miss = nodes.filter(p => !cache.has(`${p.lat},${p.lng}|${hour}`));
     for (let i = 0; i < miss.length; i += 40) {
-      const ch = miss.slice(i, i + 40), q = `latitude=${ch.map(p => p.lat).join(',')}&longitude=${ch.map(p => p.lng).join(',')}&hourly=wind_speed_10m,wind_direction_10m&wind_speed_unit=kmh&timezone=GMT`;
+      const ch = miss.slice(i, i + 40), q = `latitude=${ch.map(p => p.lat).join(',')}&longitude=${ch.map(p => p.lng).join(',')}&wind_speed_unit=kmh&timezone=GMT`;
       let j, cur = false;
-      try { j = await fetchJSON(`https://api.open-meteo.com/v1/forecast?${q}&start_hour=${hour}&end_hour=${hour}`, {}, 15000); }
-      catch { j = await fetchJSON(`https://api.open-meteo.com/v1/forecast?${q.replace('hourly=', 'current=')}`, {}, 15000); cur = true; }   // hors prévisions : vent actuel
+      try { j = await fetchJSON(`https://api.open-meteo.com/v1/forecast?${q}&hourly=wind_speed_10m,wind_direction_10m&start_hour=${hour}&end_hour=${hour}`, {}, 15000); }
+      catch (e1) {
+        if (/429/.test(e1.message)) throw e1;       // limite atteinte : inutile d'insister
+        j = await fetchJSON(`https://api.open-meteo.com/v1/forecast?${q}&current=wind_speed_10m,wind_direction_10m`, {}, 15000); cur = true;   // hors prévisions : vent actuel
+      }
       fallback = cur;
       (Array.isArray(j) ? j : [j]).forEach((o, k) => {
         const s = cur ? o.current?.wind_speed_10m : o.hourly?.wind_speed_10m?.[0], d = cur ? o.current?.wind_direction_10m : o.hourly?.wind_direction_10m?.[0];
@@ -1728,65 +1811,73 @@ const WindFx = (() => {
     return sw ? { x: sx / sw, y: sy / sw } : null;
   }
   function buildLattice(nodes, hour) {            // échantillonne le champ sur un quadrillage d'écran (24×16) pour animer vite
-    const sz = map.getSize(), cols = 24, rows = 16, f = new Float32Array(cols * rows * 2); let any = false, tx = 0, ty = 0;
+    const cols = 24, rows = 16, f = new Float32Array(cols * rows * 2); let any = false, tx = 0, ty = 0;
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-      const ll = map.containerPointToLatLng([c / (cols - 1) * sz.x, r / (rows - 1) * sz.y]), v = windAtLL(ll.lat, ll.lng, nodes, hour);
+      const ll = map.containerPointToLatLng([c / (cols - 1) * W, r / (rows - 1) * H]), v = windAtLL(ll.lat, ll.lng, nodes, hour);
       if (v) { any = true; tx += v.x; ty += v.y; } const i = (r * cols + c) * 2; f[i] = v ? v.x : 0; f[i + 1] = v ? v.y : 0;
     }
-    lattice = any ? { f, cols, rows, sz } : null;
+    lattice = any ? { f, cols, rows, W, H } : null;
     avg = any ? { s: Math.hypot(tx, ty) / (cols * rows), d: (deg(Math.atan2(-tx, -ty)) + 360) % 360 } : null;   // d = direction d'où vient le vent
   }
-  function sample(x, y) {                         // bilinéaire sur le quadrillage d'écran -> { vx (px, vers la droite), vy (vers le bas), s }
-    const L_ = lattice, gx = clamp(x / L_.sz.x, 0, 1) * (L_.cols - 1), gy = clamp(y / L_.sz.y, 0, 1) * (L_.rows - 1);
+  function sample(x, y) {                         // bilinéaire sur le quadrillage d'écran -> { vx (vers la droite), vy (vers le bas), s }
+    const L_ = lattice, gx = clamp(x / L_.W, 0, 1) * (L_.cols - 1), gy = clamp(y / L_.H, 0, 1) * (L_.rows - 1);
     const c0 = Math.floor(gx), r0 = Math.floor(gy), c1 = Math.min(L_.cols - 1, c0 + 1), r1 = Math.min(L_.rows - 1, r0 + 1), fx = gx - c0, fy = gy - r0;
     const g = (r, c, k) => L_.f[(r * L_.cols + c) * 2 + k];
     const mix = k => (g(r0, c0, k) * (1 - fx) + g(r0, c1, k) * fx) * (1 - fy) + (g(r1, c0, k) * (1 - fx) + g(r1, c1, k) * fx) * fy;
     const ex = mix(0), ny = mix(1); return { vx: ex, vy: -ny, s: Math.hypot(ex, ny) };   // écran : y vers le bas = −nord
   }
-  async function refresh(force) {
+  function refresh(force) {
     if (!on) return; clearTimeout(timer);
     timer = setTimeout(async () => {
-      const my = ++tok, hour = hourOf(state.startMs), nodes = nodesForView(); hourKey = hour;
-      try { await fetchNodes(nodes, hour); } catch (e) { console.warn('vent', e); setInfo('⚠ vent indisponible'); return; }
-      if (my !== tok) return; buildLattice(nodes, hour); setInfo();
+      place(); const my = ++tok, hour = hourOf(state.startMs), nodes = nodesForView(); hourKey = hour;
+      try { await fetchNodes(nodes, hour); errMsg = ''; }
+      catch (e) {
+        console.warn('vent', e); if (my !== tok) return;
+        errMsg = /429/.test(e.message) ? 'limite du service météo atteinte — réessaie plus tard' : /abort/i.test(e.message) ? 'réseau trop lent' : 'service météo injoignable';
+        setInfo(); if (!lattice && retry++ < 3) { clearTimeout(timer); timer = setTimeout(() => refresh(true), 20000); }   // nouvel essai automatique
+        return;
+      }
+      if (my !== tok) return; retry = 0; buildLattice(nodes, hour); setInfo();
     }, force ? 0 : 450);
   }
   function setInfo(msg) {
     const el = document.getElementById('windInfo'); if (!el) return;
-    el.textContent = msg || (avg ? `Vent du ${cardinal(avg.d)} · ${Math.round(avg.s)} km/h${fallback ? ' (actuel)' : ' · ' + new Date(state.startMs).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : 'Chargement du vent…');
+    el.classList.toggle('err', !!errMsg && !msg);
+    el.textContent = msg || (errMsg ? `⚠ Vent indisponible : ${errMsg} (touche pour réessayer)` : avg ? `Vent du ${cardinal(avg.d)} · ${Math.round(avg.s)} km/h${fallback ? ' (actuel)' : ' · ' + new Date(state.startMs).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : 'Chargement du vent…');
   }
   /* ---- particules (flèches) ---- */
   function spawn(p, fresh) {
-    p.x = Math.random() * cv.width; p.y = Math.random() * cv.height; p.life = 70 + Math.random() * 90; p.age = fresh ? Math.random() * p.life : 0; return p;
+    p.x = Math.random() * W; p.y = Math.random() * H; p.life = 70 + Math.random() * 90; p.age = fresh ? Math.random() * p.life : 0; return p;
   }
   function frame() { raf = requestAnimationFrame(frame); draw(); }
   function draw(force) {
-    ctx.clearRect(0, 0, cv.width, cv.height);
-    if (!lattice || (document.hidden && !force) || cv.style.visibility === 'hidden') return;
-    const target = Math.min(mobile() ? 320 : 650, Math.round(cv.width * cv.height / (mobile() ? 1700 : 2300)));
+    ctx.clearRect(0, 0, W, H);
+    if (!lattice || zooming || (document.hidden && !force)) return;
+    const target = Math.min(mobile() ? 320 : 650, Math.round(W * H / (mobile() ? 1700 : 2300))), big = mobile() ? 1.25 : 1;
     while (parts.length < target) parts.push(spawn({}, true));
     if (parts.length > target) parts.length = target;
     for (const p of parts) {
       const v = sample(p.x, p.y), k = v.s > .5 ? 1 / v.s : 0, step = clamp(v.s * .055, .15, 5);       // px par image : plus de vent = plus vite
       p.x += v.vx * k * step; p.y += v.vy * k * step; p.age++;
-      if (p.age > p.life || p.x < -10 || p.y < -10 || p.x > cv.width + 10 || p.y > cv.height + 10) { spawn(p, false); continue; }
-      const a = Math.min(1, p.age / 14, (p.life - p.age) / 20) * .95, len = clamp(5 + v.s * .22, 6, 15), ang = Math.atan2(v.vy, v.vx);
+      if (p.age > p.life || p.x < -10 || p.y < -10 || p.x > W + 10 || p.y > H + 10) { spawn(p, false); continue; }
+      const a = Math.min(1, p.age / 14, (p.life - p.age) / 20) * .95, len = clamp(5 + v.s * .22, 6, 15) * big, ang = Math.atan2(v.vy, v.vx), hd = 4 * big, hw = 3 * big;
       ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(ang); ctx.globalAlpha = a; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-      ctx.beginPath(); ctx.moveTo(-len / 2, 0); ctx.lineTo(len / 2, 0); ctx.moveTo(len / 2 - 4, -3); ctx.lineTo(len / 2, 0); ctx.lineTo(len / 2 - 4, 3);
-      ctx.strokeStyle = 'rgba(5,10,18,.55)'; ctx.lineWidth = 3.4; ctx.stroke();                      // liseré sombre : lisible sur carte claire
-      ctx.strokeStyle = colorOf(v.s); ctx.lineWidth = 1.7; ctx.stroke(); ctx.restore();
+      ctx.beginPath(); ctx.moveTo(-len / 2, 0); ctx.lineTo(len / 2, 0); ctx.moveTo(len / 2 - hd, -hw); ctx.lineTo(len / 2, 0); ctx.lineTo(len / 2 - hd, hw);
+      ctx.strokeStyle = 'rgba(5,10,18,.6)'; ctx.lineWidth = 3.6 * big; ctx.stroke();                  // liseré sombre : lisible sur carte claire
+      ctx.strokeStyle = colorOf(v.s); ctx.lineWidth = 1.9 * big; ctx.stroke(); ctx.restore();
     }
   }
   function setOn(v) {
     on = v; store.set('vento.windFx', v); cv.style.display = v ? '' : 'none';
     document.getElementById('btnWind')?.classList.toggle('on', v); document.getElementById('windInfo').hidden = !v;
-    cancelAnimationFrame(raf); if (v) { place(); setInfo('Chargement du vent…'); raf = requestAnimationFrame(frame); refresh(true); } else ctx.clearRect(0, 0, cv.width, cv.height);
+    cancelAnimationFrame(raf); if (v) { place(); errMsg = ''; setInfo('Chargement du vent…'); raf = requestAnimationFrame(frame); refresh(true); } else { clearTimeout(timer); ctx.clearRect(0, 0, W, H); }
   }
   function init() {
     cv.style.pointerEvents = 'none'; const pane = map.getPane('overlayPane'); pane.insertBefore(cv, pane.firstChild);
     map.on('move', place); map.on('resize', () => { place(); lattice && refresh(true); });
-    map.on('zoomstart', () => { cv.style.visibility = 'hidden'; }); map.on('zoomend', () => { cv.style.visibility = ''; place(); parts = []; refresh(); });
-    map.on('moveend', () => { place(); refresh(); });
+    map.on('zoomstart', () => { zooming = true; });
+    map.on('zoomend', () => { zooming = false; place(); parts = []; refresh(); });
+    map.on('moveend', () => { zooming = false; place(); refresh(); });      // moveend est toujours émis en fin de geste : l'animation ne peut pas rester bloquée
     const Ctl = L.Control.extend({ onAdd() {
       const d = L.DomUtil.create('div', 'windctl');
       d.innerHTML = '<button class="btn" id="btnWind" title="Flèches animées : sens, vitesse et force du vent">💨</button><div id="windInfo" hidden></div>';
@@ -1794,19 +1885,81 @@ const WindFx = (() => {
     } });
     new Ctl({ position: 'topright' }).addTo(map);
     document.getElementById('btnWind').onclick = () => setOn(!on);
-    setOn(store.get('vento.windFx', !matchMedia('(prefers-reduced-motion: reduce)').matches));
+    document.getElementById('windInfo').onclick = () => { errMsg = ''; setInfo('Chargement du vent…'); retry = 0; refresh(true); };
+    setOn(store.get('vento.windFx', true));          // actif par défaut (le bouton 💨 le coupe)
   }
   return { init, refresh, hourChanged() { if (on && hourKey !== hourOf(state.startMs)) refresh(true); }, setOn, get on() { return on; }, _dbg: () => ({ parts, lattice, avg, cache, draw }) };
 })();
+
+/* =====================================================================
+   Mes points d'intérêt (repères personnels : fontaine, ravito, vue, danger…) — enregistrés avec le parcours et exportés dans le GPX
+   ===================================================================== */
+const UPOI = {
+  water: { e: '💧', l: 'Eau', sym: 'Drinking Water' }, cafe: { e: '☕', l: 'Café / ravito', sym: 'Restaurant' }, food: { e: '🥖', l: 'Nourriture', sym: 'Restaurant' },
+  wc: { e: '🚻', l: 'Toilettes', sym: 'Restroom' }, photo: { e: '📷', l: 'Point de vue / photo', sym: 'Scenic Area' }, danger: { e: '⚠️', l: 'Danger / attention', sym: 'Danger Area' },
+  flag: { e: '🚩', l: 'Repère', sym: 'Flag, Red' }, other: { e: '📍', l: 'Autre', sym: 'Waypoint' }
+};
+let upoiEdit = null;                              // { id } en modification, ou { pt } en création
+function renderUserPois() {
+  G.upoi.clearLayers();
+  state.userPois.forEach(p => {
+    const t = UPOI[p.type] || UPOI.other;
+    const m = L.marker([p.lat, p.lng], { draggable: true, zIndexOffset: 800, icon: L.divIcon({ className: '', html: `<div class="upoi">${t.e}</div>`, iconSize: [32, 32], iconAnchor: [16, 16] }) });
+    m.on('dragend', () => { pushHistory(); const ll = m.getLatLng(); p.lat = ll.lat; p.lng = ll.lng; persist(); });
+    m.bindPopup(() => {
+      const el = document.createElement('div'); el.className = 'pop';
+      el.innerHTML = `<h4>${t.e} ${esc(p.name || t.l)}</h4><div class="m">${esc(t.l)} · glisse le repère pour le déplacer</div>`;
+      const b1 = document.createElement('button'), b2 = document.createElement('button'); b1.className = b2.className = 'btn sm'; b1.textContent = '✏️ Modifier'; b2.textContent = '🗑 Supprimer';
+      b1.onclick = () => { map.closePopup(); openUpoi({ id: p.id }); };
+      b2.onclick = () => { map.closePopup(); pushHistory(); state.userPois = state.userPois.filter(x => x.id !== p.id); renderUserPois(); persist(); };
+      const row = document.createElement('div'); row.style.cssText = 'display:flex;gap:6px;margin-top:8px'; row.append(b1, b2); el.append(row); return el;
+    });
+    G.upoi.addLayer(m);
+  });
+  const list = $('#upoiList'); if (!list) return;
+  $('#upoiTag').textContent = state.userPois.length ? state.userPois.length + ' point' + (state.userPois.length > 1 ? 's' : '') : '';
+  list.innerHTML = state.userPois.length ? state.userPois.map(p => `<div class="pitem" data-id="${p.id}"><span>${(UPOI[p.type] || UPOI.other).e}</span><span class="n">${esc(p.name || (UPOI[p.type] || UPOI.other).l)}</span><span class="k">${(UPOI[p.type] || UPOI.other).l}</span></div>`).join('') : '<p class="hint">Aucun point pour l\'instant.</p>';
+  list.querySelectorAll('.pitem').forEach(r => r.onclick = () => { const p = state.userPois.find(x => x.id === r.dataset.id); if (p) { map.setView([p.lat, p.lng], Math.max(map.getZoom(), 15)); openUpoi({ id: p.id }); } });
+}
+function openUpoi(ctx) {
+  upoiEdit = ctx; const p = ctx.id ? state.userPois.find(x => x.id === ctx.id) : null;
+  $('#upoiName').value = p?.name || ''; $('#upoiType').value = p?.type || 'water';
+  $('#upoiDel').hidden = !p; $('#upoiTitle').textContent = p ? 'Modifier le point' : 'Nouveau point d\'intérêt';
+  $('#upoiModal').hidden = false; setTimeout(() => $('#upoiName').focus(), 80);
+}
+$('#upoiType').innerHTML = Object.entries(UPOI).map(([k, v]) => `<option value="${k}">${v.e} ${v.l}</option>`).join('');
+$('#upoiSave').onclick = () => {
+  const name = $('#upoiName').value.trim().slice(0, 60), type = $('#upoiType').value; pushHistory();
+  if (upoiEdit?.id) { const p = state.userPois.find(x => x.id === upoiEdit.id); if (p) { p.name = name; p.type = type; } }
+  else if (upoiEdit?.pt) state.userPois.push({ id: 'u' + Math.random().toString(36).slice(2, 8), lat: upoiEdit.pt.lat, lng: upoiEdit.pt.lng, name, type });
+  $('#upoiModal').hidden = true; renderUserPois(); persist();
+};
+$('#upoiDel').onclick = () => { pushHistory(); state.userPois = state.userPois.filter(x => x.id !== upoiEdit?.id); $('#upoiModal').hidden = true; renderUserPois(); persist(); };
+$('#upoiCancel').onclick = () => { $('#upoiModal').hidden = true; };
+$('#upoiModal').addEventListener('click', e => { if (e.target.id === 'upoiModal') $('#upoiModal').hidden = true; });
+$('#btnAddUpoi').onclick = () => startPick('poi');
+map.on('contextmenu', e => openUpoi({ pt: { lat: e.latlng.lat, lng: e.latlng.lng } }));        // appui long (téléphone) ou clic droit (PC)
+
+/* glisser-déposer d'un fichier GPX sur la page (PC) */
+['dragover', 'drop'].forEach(ev => document.addEventListener(ev, e => {
+  if (!e.dataTransfer?.types?.includes('Files')) return; e.preventDefault();
+  if (ev === 'drop') { const f = [...e.dataTransfer.files].find(x => /\.gpx$/i.test(x.name) || /xml/.test(x.type)); if (f) f.text().then(importGPX); }
+}));
+/* GPX partagé depuis une autre application Android (menu Partager → Vento) : le service worker le dépose en cache */
+if (/[?&]shared=1/.test(location.search) && window.caches) {
+  caches.open('vento-share').then(c => c.match(new URL('shared.gpx', location.href))).then(r => r && r.text()).then(t => {
+    history.replaceState({}, '', location.pathname); caches.delete('vento-share'); if (t) importGPX(t); else toast('Aucun fichier GPX reçu');
+  }).catch(() => {});
+}
 
 /* =====================================================================
    Interactions
    ===================================================================== */
 /* Retour / Rétablir : chaque action (point ajouté, déplacé, supprimé, boucle, inversion, effacement…) est empilée,
    on peut revenir en arrière autant de fois que nécessaire (200 pas) puis rétablir. */
-const snap = () => JSON.stringify({ w: state.wps, l: state.loop, e: state.hasEnd, lb: state.labels });
+const snap = () => JSON.stringify({ w: state.wps, l: state.loop, e: state.hasEnd, lb: state.labels, u: state.userPois });
 function pushHistory() { state.history.push(snap()); state.redo = []; if (state.history.length > 200) state.history.shift(); syncButtons(); }
-function applySnap(h) { const s = JSON.parse(h); state.wps = s.w; state.loop = s.l; state.hasEnd = !!s.e; state.labels = s.lb || {}; syncButtons(); scheduleRecompute(50); }
+function applySnap(h) { const s = JSON.parse(h); state.wps = s.w; state.loop = s.l; state.hasEnd = !!s.e; state.labels = s.lb || {}; state.userPois = s.u || []; renderUserPois(); syncButtons(); scheduleRecompute(50); }
 function undo() {
   const h = state.history.pop(); if (!h) return toast('Rien à annuler');
   state.redo.push(snap()); applySnap(h);
@@ -1832,18 +1985,20 @@ function syncButtons() {
 }
 function persist() {
   syncButtons(); store.set('vento.settings', state.set);
-  store.set('vento.current', { wps: state.wps, loop: state.loop, name: state.name, hasEnd: state.hasEnd, labels: state.labels });
+  store.set('vento.current', { wps: state.wps, loop: state.loop, name: state.name, hasEnd: state.hasEnd, labels: state.labels, upois: state.userPois });
 }
 
 map.on('click', e => {
   const pt = { lat: e.latlng.lat, lng: e.latlng.lng };
-  if (state.pick) { const k = state.pick; endPick(); if (k === 'start') setStart(pt); else if (k === 'end') setEnd(pt); else setPlace(k, pt); return; }
+  if (state.pick) { const k = state.pick; endPick(); if (k === 'start') setStart(pt); else if (k === 'end') setEnd(pt); else if (k === 'poi') openUpoi({ pt }); else setPlace(k, pt); return; }
   pushHistory();
   if (state.hasEnd && !state.loop && state.wps.length >= 2) state.wps.splice(state.wps.length - 1, 0, pt);   // l'arrivée reste en dernier
   else state.wps.push(pt);
   scheduleRecompute(120);
 });
 $('#btnUndo').onclick = undo;
+$('#btnSnap').onclick = snapToRoads;
+map.on('moveend', () => { if (state.wps.length > 40) renderWaypoints(); });         // trace importée : points visibles seulement à fort zoom
 $('#btnRedo').onclick = redo;
 $('#btnSwap').onclick = reverseRoute;
 $('#btnLoop').onclick = () => { pushHistory(); state.loop = !state.loop; scheduleRecompute(50); };
@@ -1916,7 +2071,7 @@ $('#effort').innerHTML = Object.entries(Rider.EFFORTS).map(([k, v]) => `<option 
 $('#bike').value = state.set.bike; $('#radius').value = String(state.set.radius); $('#poiGpx').checked = !!state.set.poiGpx;
 renderSaved();
 const cards = [...document.querySelectorAll('#panel .card')];
-cards.forEach((c, i) => { c.classList.add(['c1', 'c5', 'c2', 'c6', 'c4', 'c7', 'c3', 'c1', 'c6'][i] || 'c1'); c.dataset.tab = ['trajet', 'taf', 'parcours', 'vent', 'vent', 'moi', 'poi', 'moi', 'moi'][i] || 'moi'; });
+cards.forEach((c, i) => { c.classList.add(['c1', 'c5', 'c2', 'c6', 'c4', 'c7', 'c7', 'c3', 'c3', 'c1', 'c6'][i] || 'c1'); c.dataset.tab = ['trajet', 'taf', 'parcours', 'vent', 'vent', 'moi', 'moi', 'poi', 'poi', 'moi', 'moi'][i] || 'moi'; });
 
 /* ---------- téléphone : onglets, panneau coulissant, barre d'actions ---------- */
 const mq = matchMedia('(max-width: 860px)'), panel = $('#panel');
@@ -1948,6 +2103,44 @@ function placeProfile() {                         // le profil d'altitude se ran
 }
 mq.addEventListener('change', placeProfile); placeProfile();
 panel.dataset.sheet = store.get('vento.sheet', 'half'); setTab(store.get('vento.tab', 'trajet'), false);
+/* ---------- activité : vélo / course à pied / marche ---------- */
+const ROUTINGS = {
+  bike: [['fastbike-verylowtraffic', '🛡️ Le plus sûr : pistes cyclables & routes très calmes'], ['fastbike-lowtraffic', 'Route peu fréquentée'], ['trekking', 'Vélo polyvalent (trekking)'], ['fastbike', 'Route rapide'],
+    ['safety', 'Route sécurisée (peu de trafic)'], ['gravel', 'Gravel'], ['mtb', 'VTT'], ['osrm', 'Vélo (serveur OSM de secours)'], ['line', 'Ligne droite (sans routage)']],
+  foot: [['hiking-beta', '🌳 Chemins & sentiers (piéton)'], ['hiking-mountain', 'Randonnée / montagne'], ['osrmfoot', 'Rues et chemins (rapide)'], ['line', 'Ligne droite (sans routage)']]
+};
+const sportKey = s => s === 'bike' ? 'bike' : 'foot';
+function applySportUI() {
+  const s = state.set.sport, foot = isFoot(), list = ROUTINGS[sportKey(s)], sel = $('#routing');
+  document.body.dataset.sport = s;
+  document.querySelectorAll('#sportSeg button').forEach(b => b.classList.toggle('on', b.dataset.sport === s));
+  sel.innerHTML = list.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('');
+  if (!list.some(([v]) => v === state.set.routing)) state.set.routing = list[0][0];
+  sel.value = state.set.routing;
+  $('#cardRider').hidden = foot; $('#cardPace').hidden = !foot;
+  if (foot) { $('#paceLabel').textContent = s === 'run' ? 'Allure de course (min/km)' : 'Allure de marche (min/km)'; $('#pace').value = fmtPace(paceOf(s)); $('#paceTag').textContent = `${(60 / paceOf(s)).toFixed(1)} km/h`; }
+  $('#mSafe').hidden = foot; document.querySelector('.safectl')?.toggleAttribute('hidden', foot);
+  document.querySelector('#colorBy [data-v=safety]').hidden = foot;
+  if (foot && state.colorBy === 'safety') { state.colorBy = 'wind'; store.set('vento.colorBy', 'wind'); }
+}
+function setSport(s, { reroute = true } = {}) {
+  if (s === state.set.sport) return;
+  const old = sportKey(state.set.sport);
+  state.set.routingBy = { ...(state.set.routingBy || {}), [old]: state.set.routing };
+  state.set.sport = s; state.set.routing = state.set.routingBy[sportKey(s)] || ROUTINGS[sportKey(s)][0][0];
+  if (isFoot() && state.safeMode) setSafeMode(false);
+  store.set('vento.settings', state.set); applySportUI();
+  if (reroute) { if (state.wps.length >= 2) scheduleRecompute(60); else renderAll(); }
+  toast({ bike: '🚴 Mode vélo', run: '🏃 Mode course à pied', walk: '🚶 Mode marche' }[s]);
+}
+document.querySelectorAll('#sportSeg button').forEach(b => b.onclick = () => setSport(b.dataset.sport));
+$('#pace').onchange = e => {
+  const v = parsePace(e.target.value);
+  if (!v) toast('Allure invalide : écris par exemple 5:30'); else { state.set.pace = { ...state.set.pace, [state.set.sport]: v }; store.set('vento.settings', state.set); }
+  e.target.value = fmtPace(paceOf(state.set.sport)); $('#paceTag').textContent = `${(60 / paceOf(state.set.sport)).toFixed(1)} km/h`; reanalyze();
+};
+applySportUI();
+renderUserPois();
 $('#mUndo').onclick = undo; $('#mRedo').onclick = redo; $('#mLoop').onclick = () => $('#btnLoop').click();
 $('#mSafe').onclick = () => setSafeMode(!state.safeMode); $('#mGpx').onclick = exportGPX;
 $('#tAller').value = state.commute.aller; $('#tRetour').value = state.commute.retour; $('#commuteSafe').checked = state.commute.safe !== false;
@@ -1956,7 +2149,7 @@ WindFx.init();
 {
   const cur = store.get('vento.current', null);
   if (cur?.wps?.length) {
-    state.wps = cur.wps; state.loop = !!cur.loop; state.name = cur.name || ''; $('#name').value = state.name; state.hasEnd = !!cur.hasEnd; state.labels = cur.labels || {};
+    state.wps = cur.wps; state.loop = !!cur.loop; state.name = cur.name || ''; $('#name').value = state.name; state.hasEnd = !!cur.hasEnd; state.labels = cur.labels || {}; state.userPois = cur.upois || [];
     map.fitBounds(L.latLngBounds(cur.wps.map(w => [w.lat, w.lng])), { padding: [70, 70], maxZoom: 13 });
   }
 }

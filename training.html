@@ -79,6 +79,11 @@ td.n,th.n{text-align:right;font-family:var(--mono)}
 .disc{font-size:12px;color:#7b8798;margin-top:14px;line-height:1.5}
 .pws{font-size:12px;color:var(--mut);margin-top:12px}
 .pws b{color:#fc4c02}
+.wsvg{display:block;width:100%;height:56px;margin:10px 0 8px;border-radius:8px;background:#0a0f15}
+.wbtns{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--mut)}
+.wbtns span{margin-right:2px}
+.wk{margin-top:14px;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--inp);font-size:13px}
+.wk p{margin:6px 0 10px;color:#c4ccd8}
 
 /* ---------- lisibilité des métriques (surtout sur téléphone) ---------- */
 #jump{display:none}
@@ -220,6 +225,11 @@ h3.ch small{color:var(--mut);font-weight:400}
     <section class="card c2" id="cardPlan" hidden>
       <h2><span><span class="ic">🗓️</span>Plan des 7 prochains jours</span><span class="tag" id="planTag"></span></h2>
       <div class="days" id="days"></div>
+      <div class="wk" id="wkHelp" hidden>
+        <b>Séances pour ton home trainer</b>
+        <p>Chaque séance se télécharge en fichier d'entraînement : <b>ZWO</b> (Zwift, MyWhoosh, TrainingPeaks Virtual, Intervals.icu…), <b>MRC</b> (en % du FTP) ou <b>ERG</b> (en watts). Les intensités sont calculées pour un <b>FTP de <span id="wkFtp"></span> W</b> : règle le même FTP dans ton application de home trainer. La résistance suit alors automatiquement les paliers de la séance.</p>
+        <button class="btn sm" id="wkAll">⬇ Toute la semaine (ZWO)</button>
+      </div>
       <p class="disc">Ces conseils sont des repères généraux calculés à partir de tes données, pas un programme de coach personnalisé. Écoute ton corps, adapte en cas de fatigue ou de douleur et demande un avis médical au moindre doute.</p>
     </section>
   </div>
@@ -553,8 +563,65 @@ function buildPlan(m) {
   if (m.last.tsb < -25) { week = [easy, rest, endu, rest, easy, { ...endu, min: 120, title: 'Endurance longue modérée', tss: tss(120, .62) }, rest]; label = 'Semaine allégée (fatigue élevée)'; }
   else if (m.last.tsb > 12 && m.last.ctl > 30) { week = [rest, key, endu, rest, test, longR, easy]; label = 'Semaine de test (tu es frais)'; }
   else { week = [rest, key, endu, rest, hills, longR, easy]; label = 'Semaine de progression'; }
+  week = week.map(d => {                                  // séance structurée (échauffement, intervalles, récupération, retour au calme)
+    if (!d.min) return d;
+    const steps = stepsOf(d.t, d.min); return { ...d, steps, min: Math.round(steps.reduce((a, s) => a + s.min, 0)), tss: workoutTss(steps) };
+  });
   const total = week.reduce((a, d) => a + d.tss, 0), hrs = week.reduce((a, d) => a + d.min, 0) / 60;
   return { week, label, total, hrs };
+}
+
+/* =====================================================================
+   Séances pour home trainer : étapes en % du FTP -> fichiers ZWO / MRC / ERG
+   ===================================================================== */
+function stepsOf(kind, min) {
+  const ramp = (m, a, b, label) => ({ min: m, a, b, label }), st = (m, p, label) => ramp(m, p, p, label);
+  const rep = (n, on, off) => { const o = []; for (let i = 0; i < n; i++) { o.push(on); if (i < n - 1) o.push(off); } return o; };
+  const warm = ramp(15, .5, .75, 'Échauffement'), cool = ramp(10, .6, .45, 'Retour au calme');
+  switch (kind) {
+    case 'VO₂max': return [warm, st(3, .55, 'Souple'), ...rep(5, st(4, 1.15, 'VO₂max : à fond contrôlé'), st(4, .5, 'Récupération')), cool];
+    case 'Seuil': return [warm, st(3, .55, 'Souple'), ...rep(3, st(12, .98, 'Seuil : puissance régulière'), st(5, .5, 'Récupération')), cool];
+    case 'Sweet spot': return [warm, st(3, .55, 'Souple'), ...rep(2, st(20, .90, 'Sweet spot'), st(5, .5, 'Récupération')), cool];
+    case 'Côtes': return [warm, st(3, .55, 'Souple'), ...rep(4, st(6, .95, 'Côte : 60–80 tr/min'), st(4, .5, 'Récupération')), cool];
+    case 'Test': return [ramp(10, .5, .75, 'Échauffement'), ...rep(3, st(1, 1.1, 'Ouverture'), st(1, .5, 'Souple')), st(5, .5, 'Récupération'), st(20, 1.0, 'TEST 20 min : à fond, régulier'), ramp(10, .6, .4, 'Retour au calme')];
+    case 'Longue': return [ramp(10, .45, .66, 'Échauffement'), st(Math.max(10, min - 15), .68, 'Endurance longue'), ramp(5, .6, .45, 'Retour au calme')];
+    case 'Récup': return [ramp(5, .4, .5, 'Mise en route'), st(Math.max(10, min - 10), .5, 'Très souple'), ramp(5, .5, .4, 'Retour au calme')];
+    default: return [ramp(5, .45, .65, 'Mise en route'), st(Math.max(10, min - 10), .65, 'Endurance'), ramp(5, .65, .45, 'Retour au calme')];
+  }
+}
+const workoutTss = steps => Math.round(steps.reduce((a, s) => a + s.min / 60 * ((s.a + s.b) / 2) ** 2 * 100, 0));
+const stepColor = f => f < .56 ? '#94a3b8' : f < .76 ? '#38bdf8' : f < .91 ? '#4ade80' : f < 1.06 ? '#fbbf24' : f < 1.21 ? '#fb923c' : '#f43f5e';
+function workoutSvg(steps) {
+  const tot = steps.reduce((a, s) => a + s.min, 0), W = 300, H = 56, mx = Math.max(1.3, ...steps.map(s => Math.max(s.a, s.b)));
+  let x = 0; const parts = steps.map(s => {
+    const w = s.min / tot * W, y1 = H - s.a / mx * H, y2 = H - s.b / mx * H, col = stepColor((s.a + s.b) / 2), pts = `${x},${H} ${x},${y1} ${x + w},${y2} ${x + w},${H}`; x += w;
+    return `<polygon points="${pts}" fill="${col}" opacity=".9"><title>${esc(s.label)} · ${s.min} min · ${Math.round(s.a * 100)}${s.a !== s.b ? '→' + Math.round(s.b * 100) : ''} % FTP</title></polygon>`;
+  }).join('');
+  return `<svg class="wsvg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Profil de la séance">${parts}</svg>`;
+}
+function workoutFile(d, fmt, ftp, name) {
+  const steps = d.steps, desc = `${d.desc} (Vento — FTP de référence ${ftp} W)`;
+  if (fmt === 'zwo') {
+    const x = ['<?xml version="1.0" encoding="UTF-8"?>', '<workout_file>', '  <author>Vento</author>', `  <name>${esc(name)}</name>`, `  <description>${esc(desc)}</description>`, '  <sportType>bike</sportType>', '  <tags/>', '  <workout>'];
+    steps.forEach(s => {
+      const dur = Math.round(s.min * 60), txt = `<textevent timeoffset="0" message="${esc(s.label)}"/>`;
+      if (Math.abs(s.a - s.b) > .005) x.push(`    <${s.a < s.b ? 'Warmup' : 'Cooldown'} Duration="${dur}" PowerLow="${s.a.toFixed(3)}" PowerHigh="${s.b.toFixed(3)}">${txt}</${s.a < s.b ? 'Warmup' : 'Cooldown'}>`);
+      else x.push(`    <SteadyState Duration="${dur}" Power="${s.a.toFixed(3)}">${txt}</SteadyState>`);
+    });
+    return x.concat(['  </workout>', '</workout_file>', '']).join('\n');
+  }
+  const pts = []; let t = 0;
+  steps.forEach(s => { pts.push([t, s.a]); t += s.min; pts.push([t, s.b]); });
+  const val = f => fmt === 'erg' ? Math.round(f * ftp) : Math.round(f * 1000) / 10;
+  const head = ['[COURSE HEADER]', 'VERSION = 2', 'UNITS = ENGLISH', `DESCRIPTION = ${name}`, `FILE NAME = ${name}.${fmt}`, ...(fmt === 'erg' ? [`FTP = ${ftp}`] : []), `MINUTES ${fmt === 'erg' ? 'WATTS' : 'PERCENT'}`, '[END COURSE HEADER]', '[COURSE DATA]'];
+  return head.concat(pts.map(([m, f]) => `${m.toFixed(2)}\t${val(f)}`), ['[END COURSE DATA]', '']).join('\r\n');
+}
+let planCache = null;
+function downloadWorkout(i, fmt) {
+  const d = planCache?.week[i]; if (!d?.steps) return;
+  const day = new Date(Date.now() + (i + 1) * DAY), tag = day.toISOString().slice(5, 10).replace('-', ''), base = `Vento_${tag}_${d.title}`.normalize('NFD').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_').slice(0, 60);
+  const text = workoutFile(d, fmt, M.ftp, base), a = document.createElement('a'), url = URL.createObjectURL(new Blob([text], { type: fmt === 'zwo' ? 'application/xml' : 'text/plain' }));
+  a.href = url; a.download = `${base}.${fmt}`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
 /* =====================================================================
@@ -707,11 +774,14 @@ function render() {
   const plan = buildPlan(m);
   if (plan) {
     $('#planTag').textContent = `${plan.label} · ≈ ${plan.hrs.toFixed(1)} h · ${Math.round(plan.total)} TSS`;
+    planCache = plan;
     $('#days').innerHTML = plan.week.map((d, i) => {
       const day = new Date(Date.now() + (i + 1) * DAY).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' });
-      return `<div class="day" style="--d:${d.c}"><h3><span>${day}</span><span class="k">${d.min ? fmtDur(d.min * 60) : ''}</span></h3><h4>${d.title}</h4>${d.pw ? `<div class="k">${d.pw[0]}–${d.pw[1]} W · ${d.hr[0]}–${d.hr[1]} bpm · ~${d.tss} TSS</div>` : ''}<p>${d.desc}</p></div>`;
+      const wk = d.steps ? `${workoutSvg(d.steps)}<div class="wbtns"><span>Home trainer :</span><button class="btn sm" data-wk="${i}" data-f="zwo" title="Zwift, MyWhoosh, TrainingPeaks Virtual, Intervals.icu…">⬇ ZWO</button><button class="btn sm" data-wk="${i}" data-f="mrc" title="% du FTP : TrainerRoad, Golden Cheetah…">⬇ MRC</button><button class="btn sm" data-wk="${i}" data-f="erg" title="Watts absolus pour ${M.ftp} W de FTP">⬇ ERG</button></div>` : '';
+      return `<div class="day" style="--d:${d.c}"><h3><span>${day}</span><span class="k">${d.min ? fmtDur(d.min * 60) : ''}</span></h3><h4>${d.title}</h4>${d.pw ? `<div class="k">${d.pw[0]}–${d.pw[1]} W · ${d.hr[0]}–${d.hr[1]} bpm · ~${d.tss} TSS</div>` : ''}<p>${d.desc}</p>${wk}</div>`;
     }).join('');
-  } else { $('#planTag').textContent = ''; $('#days').innerHTML = '<p class="mut">Le plan apparaît dès que ton FTP est connu.</p>'; }
+    $('#wkHelp').hidden = false; $('#wkFtp').textContent = m.ftp;
+  } else { $('#planTag').textContent = ''; $('#days').innerHTML = '<p class="mut">Le plan apparaît dès que ton FTP est connu.</p>'; $('#wkHelp').hidden = true; }
   // profil partagé avec le planificateur
   if (m.ftp) Rider.save({ ftp: m.ftp, weight: m.weight, mass: Math.round(m.mass * 10) / 10, k: m.k || 1, cda: m.cda || null, hrmax: m.hrmax, cp: m.cp, wp: m.wp, source: isDemo ? 'demo' : 'strava', updated: Date.now() });
 }
@@ -751,6 +821,8 @@ function loadDemo() {
 /* =====================================================================
    Événements
    ===================================================================== */
+$('#days').addEventListener('click', e => { const b = e.target.closest('[data-wk]'); if (b) downloadWorkout(+b.dataset.wk, b.dataset.f); });
+$('#wkAll').onclick = () => { (planCache?.week || []).forEach((d, i) => { if (d.steps) setTimeout(() => downloadWorkout(i, 'zwo'), i * 450); }); };
 $('#btnConnect').onclick = connect;
 $('#btnSync').onclick = () => syncActivities(25);
 $('#btnMore').onclick = async () => { try { setBar(0); await detailBatch(25); } catch (e) { setBar(null); setStatus(e.message, true); } refresh(); };

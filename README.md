@@ -15,6 +15,10 @@ Application web (PWA) pour préparer ses sorties à vélo : **vent**, **pistes c
 - **Itinéraire le plus sûr** (BRouter, profil « très peu de trafic ») avec **score de sécurité** : part de piste cyclable, bande cyclable, rue calme, route à fort trafic.
 - **Cartes** : vectorielles modernes (OpenFreeMap : moderne, clair épuré, sombre), CyclOSM, relief avec courbes de niveau, satellite. Choix via le bouton des couches en haut à droite de la carte.
 - **Carte des pistes cyclables** : fond atténué + aménagements cyclables OpenStreetMap en couleur.
+- **Vélo, course à pied ou marche** : un sélecteur en haut de l'onglet Trajet change l'activité. Routage piéton (chemins et sentiers, randonnée, rues) et durée calculée à partir de ton **allure** (ajustée à la pente et au vent) pour la course et la marche ; export GPX typé.
+- **Importer et modifier un GPX** : bouton « Importer un GPX », glisser-déposer sur PC, ou **Partager → Vento** depuis une autre application Android. La trace est conservée telle quelle ; tu la déformes en la tirant, ou tu la **recales sur les routes** (score de sécurité). Les points d'intérêt du fichier sont repris.
+- **Mes points d'intérêt** : appui long sur la carte (clic droit sur PC) pour ajouter un repère (fontaine, ravito, vue, danger…) ; ils se modifient, se déplacent, sont enregistrés avec le parcours et exportés dans le GPX.
+- **Séances pour home trainer** (page Entraînement) : chaque séance du plan se télécharge en **ZWO** (Zwift, MyWhoosh, TrainingPeaks Virtual, Intervals.icu…), **MRC** (% du FTP) ou **ERG** (watts), avec le profil de la séance.
 - **Flèches de vent animées** sur la carte (bouton 💨) : le sens des flèches suit le vent, elles défilent d'autant plus vite et changent de couleur (bleu → vert → jaune → rouge) que le vent est fort ; le vent affiché correspond à l'heure de départ choisie.
 - **Vent** par tronçon à l'heure de passage, meilleur créneau de départ, comparaison du sens de parcours.
 - **Vélo-taf** : enregistre maison et travail, compare chaque jour le vent et la durée aller / retour.
