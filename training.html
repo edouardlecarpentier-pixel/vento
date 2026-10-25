@@ -82,6 +82,7 @@ td.n,th.n{text-align:right;font-family:var(--mono)}
 .wsvg{display:block;width:100%;height:56px;margin:10px 0 8px;border-radius:8px;background:#0a0f15}
 .wbtns{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--mut)}
 .wbtns span{margin-right:2px}
+.btn.vi{background:linear-gradient(135deg,var(--c1),var(--c2));border-color:transparent;color:#061425;font-weight:700}
 .btn.rouvy{background:linear-gradient(135deg,#f97316,#ef4444);border-color:transparent;color:#fff;font-weight:700}
 .wk .steps{margin:6px 0 10px 18px;padding:0;color:#c4ccd8}.wk .steps li{margin:4px 0}
 .wk{margin-top:14px;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--inp);font-size:13px}
@@ -228,7 +229,9 @@ h3.ch small{color:var(--mut);font-weight:400}
       <h2><span><span class="ic">🗓️</span>Plan des 7 prochains jours</span><span class="tag" id="planTag"></span></h2>
       <div class="days" id="days"></div>
       <div class="wk" id="wkHelp" hidden>
-        <b>🚴 Séances pour ROUVY (home trainer)</b>
+        <b>🚴 Séances pour VeloIndoor (ton appli reliée au home trainer)</b>
+        <p>Le bouton <b>🚴 VeloIndoor</b> ouvre ton application avec la séance déjà chargée (étapes en watts pour un FTP de <span class="ftpTxt"></span> W) : il ne reste qu'à connecter le home trainer et à démarrer. Sur Android, l'application installée s'ouvre ; sinon, la version web de VeloIndoor s'ouvre. <b>📋 Copier</b> met la séance dans le presse-papiers (VeloIndoor : « Importer depuis Vento »).</p>
+        <b>Autres applications : ROUVY</b>
         <p>Chaque séance se télécharge en fichier d'entraînement que <b>ROUVY</b> sait importer (.erg, .mrc ou .zwo). Le bouton <b>ROUVY (.erg)</b> donne les <b>watts exacts</b> calculés pour un <b>FTP de <span id="wkFtp"></span> W</b>. Les formats ZWO et MRC sont en % du FTP : dans ce cas, règle le même FTP dans ton profil ROUVY.</p>
         <ol class="steps">
           <li>Télécharge la séance (bouton « ROUVY (.erg) »).</li>
@@ -785,10 +788,10 @@ function render() {
     planCache = plan;
     $('#days').innerHTML = plan.week.map((d, i) => {
       const day = new Date(Date.now() + (i + 1) * DAY).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' });
-      const wk = d.steps ? `${workoutSvg(d.steps)}<div class="wbtns"><button class="btn sm rouvy" data-wk="${i}" data-f="erg" title="Fichier .erg en watts exacts (pour ${M.ftp} W de FTP) : à importer dans ROUVY">⬇ ROUVY (.erg)</button><button class="btn sm" data-wk="${i}" data-f="zwo" title="% du FTP réglé dans ROUVY">ZWO</button><button class="btn sm" data-wk="${i}" data-f="mrc" title="% du FTP réglé dans ROUVY">MRC</button></div>` : '';
+      const wk = d.steps ? `${workoutSvg(d.steps)}<div class="wbtns"><button class="btn sm vi" data-wk="${i}" data-f="vi" title="Ouvre VeloIndoor avec cette séance prête à démarrer (watts calculés pour ${M.ftp} W de FTP)">🚴 VeloIndoor</button><button class="btn sm" data-wk="${i}" data-f="copy" title="Copie les étapes (minutes watts) : à coller dans VeloIndoor">📋 Copier</button><button class="btn sm rouvy" data-wk="${i}" data-f="erg" title="Fichier .erg en watts exacts (pour ${M.ftp} W de FTP) : à importer dans ROUVY">⬇ ROUVY (.erg)</button><button class="btn sm" data-wk="${i}" data-f="zwo" title="% du FTP réglé dans ROUVY">ZWO</button><button class="btn sm" data-wk="${i}" data-f="mrc" title="% du FTP réglé dans ROUVY">MRC</button></div>` : '';
       return `<div class="day" style="--d:${d.c}"><h3><span>${day}</span><span class="k">${d.min ? fmtDur(d.min * 60) : ''}</span></h3><h4>${d.title}</h4>${d.pw ? `<div class="k">${d.pw[0]}–${d.pw[1]} W · ${d.hr[0]}–${d.hr[1]} bpm · ~${d.tss} TSS</div>` : ''}<p>${d.desc}</p>${wk}</div>`;
     }).join('');
-    $('#wkHelp').hidden = false; $('#wkFtp').textContent = m.ftp;
+    $('#wkHelp').hidden = false; $('#wkFtp').textContent = m.ftp; document.querySelectorAll('.ftpTxt').forEach(el => el.textContent = m.ftp);
   } else { $('#planTag').textContent = ''; $('#days').innerHTML = '<p class="mut">Le plan apparaît dès que ton FTP est connu.</p>'; $('#wkHelp').hidden = true; }
   // profil partagé avec le planificateur
   if (m.ftp) Rider.save({ ftp: m.ftp, weight: m.weight, mass: Math.round(m.mass * 10) / 10, k: m.k || 1, cda: m.cda || null, hrmax: m.hrmax, cp: m.cp, wp: m.wp, source: isDemo ? 'demo' : 'strava', updated: Date.now() });
@@ -829,7 +832,18 @@ function loadDemo() {
 /* =====================================================================
    Événements
    ===================================================================== */
-$('#days').addEventListener('click', e => { const b = e.target.closest('[data-wk]'); if (b) downloadWorkout(+b.dataset.wk, b.dataset.f); });
+async function sendWorkoutToVI(i, copyOnly) {
+  const d = planCache?.week[i]; if (!d?.steps) return;
+  const plan = Rider.planLines(d.steps, M.ftp);
+  try { await navigator.clipboard.writeText(plan); } catch {}                         // copie de secours (bouton « Importer depuis Vento » dans VeloIndoor)
+  if (copyOnly) { setStatus('Séance copiée : dans VeloIndoor, touche « Importer depuis Vento ».'); return; }
+  Rider.sendToVeloIndoor({ v: 1, name: d.title, plan });
+  setStatus('Envoi à VeloIndoor… si rien ne s\'ouvre, la séance est déjà copiée : ouvre VeloIndoor puis « Importer depuis Vento ».');
+}
+$('#days').addEventListener('click', e => {
+  const b = e.target.closest('[data-wk]'); if (!b) return;
+  if (b.dataset.f === 'vi') sendWorkoutToVI(+b.dataset.wk); else if (b.dataset.f === 'copy') sendWorkoutToVI(+b.dataset.wk, true); else downloadWorkout(+b.dataset.wk, b.dataset.f);
+});
 $('#wkAll').onclick = () => { (planCache?.week || []).forEach((d, i) => { if (d.steps) setTimeout(() => downloadWorkout(i, 'erg'), i * 450); }); };
 $('#btnConnect').onclick = connect;
 $('#btnSync').onclick = () => syncActivities(25);

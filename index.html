@@ -578,6 +578,7 @@ input:focus,select:focus{border-color:var(--a,var(--acc))}
     <p class="mut" id="sendInfo"></p>
     <button class="btn primary" id="sendDl">⬇ 1. Télécharger le GPX</button>
     <a class="btn" id="sendWeb" href="https://connect.garmin.com/modern/courses" target="_blank" rel="noopener">🌐 2. Ouvrir Garmin Connect (import du parcours)</a>
+    <button class="btn" id="sendVI" title="Ouvre VeloIndoor avec ce parcours (pente envoyée au home trainer)">🚴 Envoyer le parcours à VeloIndoor</button>
     <a class="btn" id="sendRouvy" href="https://riders.rouvy.com/" target="_blank" rel="noopener">🏠 Home trainer : ouvrir le portail ROUVY</a>
     <p class="mut" id="sendRouvyNote" style="font-size:12px"></p>
     <a class="btn" id="sendApp" hidden href="intent://connect.garmin.com/modern/#Intent;scheme=https;package=com.garmin.android.apps.connectmobile;S.browser_fallback_url=https%3A%2F%2Fconnect.garmin.com%2Fmodern%2Fcourses;end">📱 Ouvrir l'application Garmin Connect</a>
@@ -1448,7 +1449,7 @@ function exportGPX() {
   if (!matchMedia('(pointer: coarse)').matches) downloadGpx(g);          // PC : téléchargement immédiat ; téléphone : on propose les options
   const rt = state.route;
   $('#sendInfo').textContent = `${g.name} · ${fmtKm(rt.total)} km · ${g.count} points · ${g.fname}`;
-  $('#sendRouvy').hidden = isFoot(); $('#sendRouvyNote').hidden = isFoot();
+  $('#sendRouvy').hidden = isFoot(); $('#sendRouvyNote').hidden = isFoot(); $('#sendVI').hidden = isFoot();
   $('#sendRouvyNote').textContent = rt.total > 200000 ? '⚠ Plus de 200 km : ROUVY refusera ce fichier (limite 200 km / 10 Mo).' : 'ROUVY : portail → Routes → « Import from file » avec ce GPX, lissage d\'altitude désactivé (fichier créé avec un planificateur).';
   $('#sendShare').hidden = !navigator.share;
   $('#sendApp').hidden = !/Android/i.test(navigator.userAgent);
@@ -1466,6 +1467,16 @@ async function shareGpx() {                                               // feu
   toast('Ton navigateur ne partage pas les fichiers GPX : utilise « Télécharger »');
 }
 $('#sendDl').onclick = () => lastGpx && downloadGpx(lastGpx);
+$('#sendVI').onclick = async () => {              // parcours -> VeloIndoor (≤ 250 points avec altitude)
+  const rt = state.route; if (!rt) return;
+  const { pts, ele, n, hasEle } = { ...rt.rs }, step = Math.max(1, Math.ceil(n / 250)), route = [];
+  for (let i = 0; i < n; i += step) route.push([+pts[i][0].toFixed(5), +pts[i][1].toFixed(5), hasEle ? Math.round(ele[i]) : null]);
+  if ((n - 1) % step) route.push([+pts[n - 1][0].toFixed(5), +pts[n - 1][1].toFixed(5), hasEle ? Math.round(ele[n - 1]) : null]);
+  const payload = { v: 1, name: state.name.trim() || 'Parcours Vento', route };
+  try { await navigator.clipboard.writeText(JSON.stringify(payload)); } catch {}      // copie de secours : « Importer depuis Vento » dans VeloIndoor
+  Rider.sendToVeloIndoor(payload);
+  toast('Envoi à VeloIndoor… (parcours aussi copié : « Importer depuis Vento »)', 6000);
+};
 $('#sendShare').onclick = shareGpx;
 $('#sendClose').onclick = () => { $('#sendModal').hidden = true; };
 $('#sendModal').addEventListener('click', e => { if (e.target.id === 'sendModal') $('#sendModal').hidden = true; });

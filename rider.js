@@ -65,6 +65,34 @@ const Rider = (() => {
       : s >= 16000 ? { n: 'Cat 3', c: '#fbbf24' } : s >= 8000 ? { n: 'Cat 4', c: '#4ade80' } : { n: 'Non cat.', c: '#94a3b8' };
   }
 
+  /* ---- envoi vers l'application VeloIndoor (home trainer) : lien web ou lien Android avec repli sur la version web ---- */
+  const VI_WEB = 'https://edouardlecarpentier-pixel.github.io/veloindoor/', VI_PKG = 'io.github.edouardlecarpentier.veloindoor';
+  const b64url = obj => {
+    const u = new TextEncoder().encode(JSON.stringify(obj)); let s = '';
+    for (let i = 0; i < u.length; i += 0x4000) s += String.fromCharCode(...u.subarray(i, i + 0x4000));
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  };
+  function veloIndoorLinks(payload) {
+    const d = b64url(payload), web = `${VI_WEB}#d=${d}`;
+    return { web, size: d.length, intent: `intent://import?d=${d}#Intent;scheme=veloindoor;package=${VI_PKG};S.browser_fallback_url=${encodeURIComponent(web)};end` };
+  }
+  function sendToVeloIndoor(payload) {            // Android : ouvre l'appli (ou, à défaut, la version web) ; PC : version web dans un nouvel onglet
+    const l = veloIndoorLinks(payload);
+    if (/Android/i.test(navigator.userAgent)) location.href = l.intent; else window.open(l.web, '_blank', 'noopener');
+    return l;
+  }
+  /** Étapes (% du FTP) -> lignes « minutes watts # étape » : les rampes deviennent des paliers de ≈ 2 min. */
+  function planLines(steps, ftp) {
+    const out = [];
+    for (const s of steps) {
+      if (Math.abs(s.a - s.b) > .005) {
+        const n = Math.max(1, Math.round(s.min / 2));
+        for (let k = 0; k < n; k++) out.push(`${+(s.min / n).toFixed(2)} ${Math.round((s.a + (s.b - s.a) * (k + .5) / n) * ftp)} # ${s.label}`);
+      } else out.push(`${+s.min.toFixed(2)} ${Math.round(s.a * ftp)} # ${s.label}`);
+    }
+    return out.join('\n');
+  }
+
   const KEY = 'vento.rider';
   const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || null; } catch { return null; } };
   const save = o => {                          // n'écrit pas si rien n'a changé (évite des synchronisations inutiles)
@@ -76,5 +104,5 @@ const Rider = (() => {
   };
   const clear = () => { try { localStorage.removeItem(KEY); } catch {} };
 
-  return { solveSpeed, cdaFrom, POWER_ZONES, HR_ZONES, powerZone, EFFORTS, durability, targetPower, detectClimbs, climbCat, load, save, clear, G, RHO, EFF };
+  return { solveSpeed, cdaFrom, POWER_ZONES, HR_ZONES, powerZone, EFFORTS, durability, targetPower, detectClimbs, climbCat, load, save, clear, G, RHO, EFF, veloIndoorLinks, sendToVeloIndoor, planLines };
 })();
