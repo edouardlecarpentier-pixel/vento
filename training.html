@@ -234,6 +234,22 @@ h3.ch small{color:var(--mut);font-weight:400}
       <div id="advice"></div>
     </section>
 
+    <section class="card c2" id="cardToday" hidden>
+      <h2><span><span class="ic">🎯</span>Ta séance du jour</span><span class="tag" id="todayTag"></span></h2>
+      <div id="ftpHint"></div>
+      <div id="today"></div>
+    </section>
+
+    <section class="card c3" id="cardBilan" hidden>
+      <h2><span><span class="ic">✅</span>Bilan prévu / réalisé</span><span class="tag" id="bilanTag"></span></h2>
+      <div id="bilan"></div>
+    </section>
+
+    <section class="card c5" id="cardProg" hidden>
+      <h2><span><span class="ic">🚀</span>Ta progression</span><span class="tag" id="progTag"></span></h2>
+      <div id="prog"></div>
+    </section>
+
     <section class="card c2" id="cardPlan" hidden>
       <h2><span><span class="ic">🗓️</span>Plan des 7 prochains jours</span><span class="tag" id="planTag"></span></h2>
       <div class="days" id="days"></div>
@@ -478,7 +494,8 @@ async function importFromHash() {
     if (isDemo) { rides = []; isDemo = false; store.set('vento.demo', false); Rider.clear(); }
     const rec = rideFromIndoor(p); rides.unshift(rec); rides.sort((a, b) => b.date - a.date); persistRides();
     store.set(PENDING, [...store.get(PENDING, []), p]);
-    setStatus('Sortie VeloIndoor importée ✓ (' + Math.round(rec.time / 60) + ' min, ' + rec.avgW + ' W moy.)');
+    const bl = makeBilan(p);
+    setStatus('Sortie VeloIndoor importée ✓ (' + Math.round(rec.time / 60) + ' min, ' + rec.avgW + ' W moy.)' + (bl ? ' — ' + bl.verdict : ''));
     return true;
   } catch (e) { setStatus('Import VeloIndoor impossible : ' + e.message, true); return false; }
 }
@@ -671,6 +688,7 @@ function buildPlan(m) {
   const tss = (min, i) => Math.round(min / 60 * i * i * 100);
   const sh = m.ztot ? m.zsec.map(s => s / m.ztot) : null, high = sh ? sh[4] + sh[5] + sh[6] : 0, mid = sh ? sh[2] + sh[3] : 0;
   const long = clamp(Math.round((median(m.longRides) || 120) * 1.1 / 10) * 10, 120, 240);
+  const adj = clamp(store.get('vento.planAdj', 1), .9, 1.06);     // ajustement appris des bilans (séances trop dures / trop faciles)
   const rest = { t: 'Repos', c: '#64748b', title: 'Repos', desc: 'Repos complet ou marche. La progression se fait pendant la récupération.', min: 0, tss: 0 };
   const S_ = (t, c, title, min, ratio, pw, hr, desc) => ({ t, c, title, min, tss: tss(min, ratio), pw: W(...pw), hr: H(...hr), desc });
   const endu = S_('Endurance', '#38bdf8', 'Endurance', 90, .65, [.56, .75], [.6, .7], 'Roule facile, à la respiration nasale. Parcours plat à vallonné.');
@@ -686,12 +704,15 @@ function buildPlan(m) {
   if (m.last.tsb < -25) { week = [easy, rest, endu, rest, easy, { ...endu, min: 120, title: 'Endurance longue modérée', tss: tss(120, .62) }, rest]; label = 'Semaine allégée (fatigue élevée)'; }
   else if (m.last.tsb > 12 && m.last.ctl > 30) { week = [rest, key, endu, rest, test, longR, easy]; label = 'Semaine de test (tu es frais)'; }
   else { week = [rest, key, endu, rest, hills, longR, easy]; label = 'Semaine de progression'; }
-  week = week.map(d => {                                  // séance structurée (échauffement, intervalles, récupération, retour au calme)
+  const fin = d => {                                      // séance structurée (échauffement, intervalles, récupération, retour au calme)
     if (!d.min) return d;
-    const steps = stepsOf(d.t, d.min); return { ...d, steps, min: Math.round(steps.reduce((a, s) => a + s.min, 0)), tss: workoutTss(steps) };
-  });
+    const steps = stepsOf(d.t, d.min).map(s => (s.a >= .85 || s.b >= .85) ? { ...s, a: s.a * adj, b: s.b * adj } : s);
+    return { ...d, steps, min: Math.round(steps.reduce((a, s) => a + s.min, 0)), tss: workoutTss(steps) };
+  };
+  week = week.map(fin);
+  const pieces = { rest, endu: fin(endu), easy: fin(easy), longR: fin(longR), key: fin(key), hills: fin(hills), test: fin(test) };
   const total = week.reduce((a, d) => a + d.tss, 0), hrs = week.reduce((a, d) => a + d.min, 0) / 60;
-  return { week, label, total, hrs };
+  return { week, label, total, hrs, pieces, adj };
 }
 
 /* =====================================================================
@@ -740,12 +761,40 @@ function workoutFile(d, fmt, ftp, name) {
   return head.concat(pts.map(([m, f]) => `${m.toFixed(2)}\t${val(f)}`), ['[END COURSE DATA]', '']).join('\r\n');
 }
 let planCache = null;
-function downloadWorkout(i, fmt) {
-  const d = planCache?.week[i]; if (!d?.steps) return;
-  const day = new Date(Date.now() + (i + 1) * DAY), tag = day.toISOString().slice(5, 10).replace('-', ''), base = `Vento_${tag}_${d.title}`.normalize('NFD').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_').slice(0, 60);
-  const text = workoutFile(d, fmt, M.ftp, base), a = document.createElement('a'), url = URL.createObjectURL(new Blob([text], { type: fmt === 'zwo' ? 'application/xml' : 'text/plain' }));
+/* Fichier FIT « workout » (séance guidée Garmin : Edge 1040 → dossier Garmin/NewFiles, ou import dans Garmin Connect) */
+function fitWorkout(steps, ftp, name) {
+  const b = [], u8 = v => b.push(v & 255), u16 = v => { u8(v); u8(v >> 8); }, u32 = v => { u16(v & 0xffff); u16(v >>> 16); };
+  const str = (s, n) => { const t = new TextEncoder().encode(s).slice(0, n - 1); for (let i = 0; i < n; i++) u8(t[i] || 0); };
+  const def = (loc, num, fields) => { u8(0x40 | loc); u8(0); u8(0); u16(num); u8(fields.length); fields.forEach(f => { u8(f[0]); u8(f[1]); u8(f[2]); }); };
+  const crc = (arr, c = 0) => {
+    const T = [0x0000, 0xCC01, 0xD801, 0x1400, 0xF001, 0x3C00, 0x2800, 0xE401, 0xA001, 0x6C00, 0x7800, 0xB401, 0x5000, 0x9C01, 0x8801, 0x4400];
+    for (const x of arr) { let t = T[c & 15]; c = (c >> 4) & 0x0fff; c = c ^ t ^ T[x & 15]; t = T[c & 15]; c = (c >> 4) & 0x0fff; c = c ^ t ^ T[(x >> 4) & 15]; } return c;
+  };
+  def(0, 0, [[0, 1, 0x00], [1, 2, 0x84], [2, 2, 0x84], [3, 4, 0x8C], [4, 4, 0x86]]);              // file_id
+  u8(0); u8(5); u16(255); u16(0); u32(1); u32(Math.floor(Date.now() / 1000) - 631065600);
+  def(1, 26, [[4, 1, 0x00], [6, 2, 0x84], [8, 32, 0x07]]);                                       // workout
+  u8(1); u8(2); u16(steps.length); str(name, 32);
+  def(2, 27, [[254, 2, 0x84], [0, 16, 0x07], [1, 1, 0x00], [2, 4, 0x86], [3, 1, 0x00], [4, 4, 0x86], [5, 4, 0x86], [6, 4, 0x86], [7, 1, 0x00]]);   // workout_step
+  steps.forEach((s, i) => {
+    const lo = Math.min(s.a, s.b), hi = Math.max(s.a, s.b), steady = hi - lo < .005, f = (lo + hi) / 2;
+    const L = Math.round((steady ? lo * .97 : lo) * ftp) + 1000, H = Math.round((steady ? hi * 1.03 : hi) * ftp) + 1000;
+    const inten = f < .6 && steady ? 1 : (s.a < s.b && s.label.startsWith('Échauffement') ? 2 : (s.a > s.b ? 3 : 0));
+    u8(0x42); u16(i); str(s.label.normalize('NFD').replace(/[^\x20-\x7e]/g, ''), 16); u8(0); u32(Math.round(s.min * 60000)); u8(4); u32(0); u32(L); u32(H); u8(inten);
+  });
+  const data = Uint8Array.from(b), head = [14, 0x20, 2100 & 255, 2100 >> 8, data.length & 255, (data.length >> 8) & 255, (data.length >> 16) & 255, data.length >>> 24, 0x2E, 0x46, 0x49, 0x54, 0, 0];
+  const out = new Uint8Array(14 + data.length + 2); out.set(head); out.set(data, 14);
+  const c = crc(out.subarray(0, 14 + data.length)); out[14 + data.length] = c & 255; out[15 + data.length] = c >> 8;
+  return out;
+}
+const safeName = s => s.normalize('NFD').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_').slice(0, 60);
+function downloadSession(d, fmt, dayOffset) {
+  if (!d?.steps) return;
+  const day = new Date(Date.now() + dayOffset * DAY), tag = day.toISOString().slice(5, 10).replace('-', ''), base = safeName(`Vento_${tag}_${d.title}`);
+  const data = fmt === 'fit' ? fitWorkout(d.steps, M.ftp, d.title) : workoutFile(d, fmt, M.ftp, base), a = document.createElement('a'),
+    url = URL.createObjectURL(new Blob([data], { type: fmt === 'zwo' ? 'application/xml' : fmt === 'fit' ? 'application/octet-stream' : 'text/plain' }));
   a.href = url; a.download = `${base}.${fmt}`; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
+function downloadWorkout(i, fmt) { downloadSession(planCache?.week[i], fmt, i + 1); }
 
 /* =====================================================================
    Rendu
@@ -847,7 +896,7 @@ const tile = (label, val, unit, sub, col) => `<div class="tile" style="--t:${col
 function render() {
   M = computeModel(); const m = M, has = m.nRides > 0;
   $('#demoBanner').hidden = !isDemo;
-  for (const id of ['cardLoad', 'cardCurve', 'cardWeek', 'cardZones', 'cardClimbs', 'cardAdvice', 'cardPlan']) $('#' + id).hidden = !has;
+  for (const id of ['cardLoad', 'cardCurve', 'cardWeek', 'cardZones', 'cardClimbs', 'cardAdvice', 'cardPlan', 'cardToday', 'cardBilan', 'cardProg']) $('#' + id).hidden = !has;
   $('#cardProfile').hidden = false;                    // profil saisissable à la main même sans sorties synchronisées
   const connected = !!S.refresh && !isDemo;
   $('#btnSync').hidden = !connected; $('#btnMore').hidden = !connected; $('#btnLogout').hidden = !connected; $('#btnConnect').textContent = connected ? 'Reconnecter Strava' : 'Se connecter à Strava';
@@ -900,15 +949,107 @@ function render() {
     planCache = plan;
     $('#days').innerHTML = plan.week.map((d, i) => {
       const day = new Date(Date.now() + (i + 1) * DAY).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' });
-      const wk = d.steps ? `${workoutSvg(d.steps)}<div class="wbtns"><button class="btn sm vi" data-wk="${i}" data-f="vi" title="Ouvre VeloIndoor avec cette séance prête à démarrer (watts calculés pour ${M.ftp} W de FTP)">🚴 VeloIndoor</button><button class="btn sm" data-wk="${i}" data-f="copy" title="Copie les étapes (minutes watts) : à coller dans VeloIndoor">📋 Copier</button><button class="btn sm rouvy" data-wk="${i}" data-f="erg" title="Fichier .erg en watts exacts (pour ${M.ftp} W de FTP) : à importer dans ROUVY">⬇ ROUVY (.erg)</button><button class="btn sm" data-wk="${i}" data-f="zwo" title="% du FTP réglé dans ROUVY">ZWO</button><button class="btn sm" data-wk="${i}" data-f="mrc" title="% du FTP réglé dans ROUVY">MRC</button></div>` : '';
+      const wk = d.steps ? `${workoutSvg(d.steps)}<div class="wbtns"><button class="btn sm vi" data-wk="${i}" data-f="vi" title="Ouvre VeloIndoor avec cette séance prête à démarrer (watts calculés pour ${M.ftp} W de FTP)">🚴 VeloIndoor</button><button class="btn sm" data-wk="${i}" data-f="copy" title="Copie les étapes (minutes watts) : à coller dans VeloIndoor">📋 Copier</button><button class="btn sm" data-wk="${i}" data-f="fit" title="Séance guidée Garmin (Edge 1040) : fichier à copier dans Garmin/NewFiles ou à importer dans Garmin Connect">⬇ Garmin (.fit)</button><button class="btn sm rouvy" data-wk="${i}" data-f="erg" title="Fichier .erg en watts exacts (pour ${M.ftp} W de FTP) : à importer dans ROUVY">⬇ ROUVY (.erg)</button><button class="btn sm" data-wk="${i}" data-f="zwo" title="% du FTP réglé dans ROUVY">ZWO</button><button class="btn sm" data-wk="${i}" data-f="mrc" title="% du FTP réglé dans ROUVY">MRC</button></div>` : '';
       return `<div class="day" style="--d:${d.c}"><h3><span>${day}</span><span class="k">${d.min ? fmtDur(d.min * 60) : ''}</span></h3><h4>${d.title}</h4>${d.pw ? `<div class="k">${d.pw[0]}–${d.pw[1]} W · ${d.hr[0]}–${d.hr[1]} bpm · ~${d.tss} TSS</div>` : ''}<p>${d.desc}</p>${wk}</div>`;
     }).join('');
     $('#wkHelp').hidden = false; $('#wkFtp').textContent = m.ftp; document.querySelectorAll('.ftpTxt').forEach(el => el.textContent = m.ftp);
   } else { $('#planTag').textContent = ''; $('#days').innerHTML = '<p class="mut">Le plan apparaît dès que ton FTP est connu.</p>'; $('#wkHelp').hidden = true; }
-  // profil partagé avec le planificateur
-  if (m.ftp) Rider.save({ ftp: m.ftp, weight: m.weight, mass: Math.round(m.mass * 10) / 10, k: m.k || 1, cda: m.cda || null, hrmax: m.hrmax, cp: m.cp, wp: m.wp, source: isDemo ? 'demo' : 'strava', updated: Date.now() });
+  renderCoach(m, plan);
+  // profil partagé avec le planificateur (+ forme du jour : le planificateur adapte la difficulté des parcours)
+  if (m.ftp) Rider.save({ ftp: m.ftp, weight: m.weight, mass: Math.round(m.mass * 10) / 10, k: m.k || 1, cda: m.cda || null, hrmax: m.hrmax, cp: m.cp, wp: m.wp, source: isDemo ? 'demo' : 'strava', form: { ctl: Math.round(m.last.ctl), tsb: Math.round(m.last.tsb), day: Math.floor(m.now / DAY) }, updated: Date.now() });
 }
 const refresh = () => { try { render(); } catch (e) { console.error(e); setStatus('Erreur d\'affichage : ' + e.message, true); } };
+
+/* =====================================================================
+   Coach : séance du jour, suivi du FTP, bilan prévu/réalisé, progression
+   ===================================================================== */
+const sBtns = (att, extra = '') => `<div class="wbtns"><button class="btn sm vi" ${att} data-f="vi" title="Ouvre VeloIndoor avec cette séance prête à démarrer">🚴 VeloIndoor</button><button class="btn sm" ${att} data-f="copy">📋 Copier</button><button class="btn sm" ${att} data-f="fit" title="Séance guidée pour ta Garmin (Edge 1040) : copie le fichier dans Garmin/NewFiles par USB, ou importe-le dans Garmin Connect">⬇ Garmin (.fit)</button><button class="btn sm rouvy" ${att} data-f="erg">ROUVY (.erg)</button><button class="btn sm" ${att} data-f="zwo">ZWO</button><button class="btn sm" ${att} data-f="mrc">MRC</button></div>${extra}`;
+const dayStart = () => new Date().setHours(0, 0, 0, 0);
+const bestRide = (w, d0, d1) => { let b = { w: 0 }; for (const r of rides) if (r.d?.pc?.[w]) { const age = (Date.now() - r.date) / DAY; if (age >= d0 && age < d1 && r.d.pc[w] > b.w) b = { w: r.d.pc[w], date: r.date, name: r.name }; } return b; };
+function todayPick(m, plan) {
+  const P = plan.pieces, d0 = dayStart(), why = [], inDay = (a, b) => rides.filter(r => r.date >= a && r.date < b);
+  const done = inDay(d0, d0 + DAY), yest = inDay(d0 - DAY, d0), tssOf = l => l.reduce((a, r) => a + m.tssOf(r), 0);
+  const hard = r => r.devW && r.npW && m.ftp && r.npW / m.ftp > .85 && r.time > 1800;
+  const ago = (list, f) => { const r = list.filter(f).sort((a, b) => b.date - a.date)[0]; return r ? Math.floor((d0 - new Date(r.date).setHours(0, 0, 0, 0)) / DAY) : 99; };
+  const hardAgo = ago(rides, hard), longAgo = ago(rides, r => r.time > 5400), testAgo = Math.floor((Date.now() - store.get('vento.lastTest', 0)) / DAY);
+  const streak = [1, 2, 3, 4].every(k => inDay(d0 - k * DAY, d0 - (k - 1) * DAY).length);
+  const dow = new Date().getDay(), tsb = m.last.tsb;
+  if (done.length) return { done, d: null, why: [`Tu as déjà roulé aujourd'hui (${done.map(r => esc(r.name)).join(', ')}) : bien joué.`] };
+  let pick;
+  if (streak) { pick = P.rest; why.push('4 jours de suite sans repos : un jour off consolide la progression.'); }
+  else if (tsb < -25) { pick = P.easy; why.push(`Fatigue élevée (fraîcheur ${tsb.toFixed(0)}) : récupération active.`); }
+  else if (tssOf(yest) > 90) { pick = P.easy; why.push(`Grosse journée hier (${Math.round(tssOf(yest))} TSS) : on récupère.`); }
+  else if (hardAgo >= 2 && tsb > -18) {
+    if (tsb > 12 && m.last.ctl > 30 && testAgo > 28) { pick = P.test; why.push(`Tu es frais (+${tsb.toFixed(0)}) et ton dernier test date de plus de 4 semaines.`); }
+    else { pick = P.key; why.push(hardAgo === 99 ? 'Pas de séance intense récente.' : `Dernière séance intense il y a ${hardAgo} jours : tu es prêt.`); }
+  } else if ((dow === 6 || dow === 0) && longAgo >= 6) { pick = P.longR; why.push('Week-end et pas de sortie longue depuis ' + (longAgo === 99 ? 'longtemps' : longAgo + ' jours') + '.'); }
+  else { pick = P.endu; why.push(hardAgo < 2 ? 'Séance intense récente : on enchaîne par de l\'endurance.' : 'Endurance de base.'); }
+  if (plan.adj !== 1) why.push(`Intensités ajustées à ×${plan.adj.toFixed(2)} d'après tes derniers bilans.`);
+  return { done: null, d: pick, why };
+}
+function ftpAdvice(m) {
+  const hist = store.get('vento.ftpHist', []), cur = m.ftpAuto, last = hist[hist.length - 1];
+  if (cur && (!last || Math.abs(cur - last.ftp) >= 3) && !isDemo) { hist.push({ t: Date.now(), ftp: cur }); store.set('vento.ftpHist', hist.slice(-30)); }
+  const rec = bestRide(1200, 0, 90), box = [];
+  if (ov.ftp && m.ftpAuto >= ov.ftp + 4) box.push(`<div class="find good"><div style="font-size:20px">📈</div><div><b>Nouveau FTP détecté : ${m.ftpAuto} W</b><p>Tu as tenu ${rec.w} W pendant 20 min${rec.date ? ' le ' + new Date(rec.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }) : ''} (95 % = ${Math.round(rec.w * .95)} W), au-dessus de ton FTP saisi (${ov.ftp} W). <button class="btn sm primary" id="btnFtpApply">Appliquer ${m.ftpAuto} W</button></p></div></div>`);
+  else if (!ov.ftp && hist.length >= 2) { const first = hist[Math.max(0, hist.length - 6)], dlt = cur - first.ftp; if (Math.abs(dlt) >= 3) box.push(`<div class="find ${dlt > 0 ? 'good' : 'info'}"><div style="font-size:20px">${dlt > 0 ? '📈' : '📉'}</div><div><b>FTP automatique : ${cur} W (${dlt > 0 ? '+' : ''}${dlt} W depuis le ${new Date(first.t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })})</b><p>Calculé sur ton meilleur 20 min des 90 derniers jours (sorties extérieures et VeloIndoor). Tes zones et séances se mettent à jour toutes seules.</p></div></div>`); }
+  return box.join('');
+}
+function renderToday(m, plan) {
+  const card = $('#cardToday'); card.hidden = !plan; if (!plan) return;
+  const t = todayPick(m, plan);
+  $('#todayTag').textContent = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  $('#ftpHint').innerHTML = ftpAdvice(m);
+  const b = $('#btnFtpApply'); if (b) b.onclick = () => { ov.ftp = m.ftpAuto; store.set('vento.profile', ov); refresh(); };
+  window.todayCache = t.d;
+  if (!t.d) { $('#today').innerHTML = `<p>${t.why.join(' ')}</p>`; return; }
+  const d = t.d;
+  $('#today').innerHTML = `<div class="day" style="--d:${d.c}"><h3><span>Aujourd'hui</span><span class="k">${d.min ? fmtDur(d.min * 60) : ''}</span></h3><h4>${d.title}</h4>${d.pw ? `<div class="k">${d.pw[0]}–${d.pw[1]} W · ${d.hr[0]}–${d.hr[1]} bpm · ~${d.tss} TSS</div>` : ''}<p>${d.desc}</p><p class="mut" style="font-size:12.5px">Pourquoi : ${t.why.join(' ')}</p>${d.steps ? workoutSvg(d.steps) + sBtns('data-today="1"') : ''}</div>`;
+}
+/* Bilan : compare la séance envoyée à VeloIndoor à ce qui a été réellement roulé */
+function makeBilan(p) {
+  const sent = store.get('vento.lastSent', null); if (!sent || !sent.steps) return null;
+  if (p.start < sent.t - 5 * 60e3 || p.start > sent.t + 36 * 3600e3) return null;
+  const t0 = p.samples[0][0], ftp = sent.ftp, rows = []; let at = 0, wT = 0, wA = 0, wOk = 0, wN = 0;
+  for (const s of sent.steps) {
+    const a0 = at, a1 = at + s.min * 60; at = a1;
+    const sm = p.samples.filter(x => x[0] - t0 >= a0 + 20 && x[0] - t0 < a1), tgt = (s.a + s.b) / 2 * ftp;
+    if (!sm.length) { rows.push({ l: s.label, min: s.min, tgt: Math.round(tgt), act: null }); continue; }
+    const act = sm.reduce((q, x) => q + (x[1] || 0), 0) / sm.length, work = (s.a + s.b) / 2 >= .85;
+    let ok = 0; for (const x of sm) { const sp = s.a + (s.b - s.a) * Math.min(1, Math.max(0, (x[0] - t0 - a0) / (a1 - a0))); if (Math.abs((x[1] || 0) - sp * ftp) <= .08 * sp * ftp) ok++; }
+    rows.push({ l: s.label, min: s.min, tgt: Math.round(tgt), act: Math.round(act), ok: Math.round(ok / sm.length * 100), work });
+    if (work) { wT += tgt * sm.length; wA += act * sm.length; wOk += ok; wN += sm.length; }
+  }
+  const planned = at, got = p.samples[p.samples.length - 1][0] - t0, completion = Math.min(1, got / planned);
+  const ratio = wN ? wA / wT : null, within = wN ? wOk / wN : null;
+  let verdict, adj = store.get('vento.planAdj', 1);
+  if (completion < .8) verdict = `Séance écourtée (${Math.round(completion * 100)} % de la durée prévue).`;
+  else if (ratio == null) verdict = 'Séance terminée.';
+  else if (ratio < .93) { verdict = `Intervalles tenus à ${Math.round(ratio * 100)} % de la cible : un peu trop dur. Je baisse les prochaines séances de 3 %.`; adj = Math.max(.9, adj - .03); }
+  else if (ratio >= .99 && within >= .8) { verdict = `Cibles tenues (${Math.round(within * 100)} % du temps dans la zone) : très bien. Je monte les prochaines séances de 2 %.`; adj = Math.min(1.06, adj + .02); }
+  else verdict = `Intervalles à ${Math.round(ratio * 100)} % de la cible : bon travail, on garde la même intensité.`;
+  store.set('vento.planAdj', Math.round(adj * 100) / 100);
+  if (sent.kind === 'Test') store.set('vento.lastTest', p.start);
+  const bl = { t: p.start, title: sent.title, verdict, completion, ratio, within, rows };
+  store.set('vento.bilans', [bl, ...store.get('vento.bilans', [])].slice(0, 20)); store.del('vento.lastSent');
+  return bl;
+}
+function renderBilan() {
+  const list = store.get('vento.bilans', []); $('#cardBilan').hidden = !list.length; if (!list.length) return;
+  $('#bilanTag').textContent = list.length + ' séance(s)';
+  $('#bilan').innerHTML = list.slice(0, 5).map((b, i) => `<div class="find ${b.ratio != null && b.ratio < .93 || b.completion < .8 ? 'warn' : 'good'}"><div style="font-size:20px">${b.completion < .8 ? '⏱️' : b.ratio != null && b.ratio < .93 ? '⚠️' : '✅'}</div><div><b>${esc(b.title)} · ${new Date(b.t).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</b><p>${b.verdict}</p>${i === 0 ? `<div class="ctable">${b.rows.filter(r => r.act != null).map(r => `<div class="crow"><span>${esc(r.l)} · ${r.min} min</span><span><b>${r.act}</b> / ${r.tgt} W${r.work ? ' · ' + r.ok + ' %' : ''}</span></div>`).join('')}</div>` : ''}</div></div>`).join('');
+}
+function renderProg(m) {
+  const card = $('#cardProg'); const ws = [[60, '1 min'], [300, '5 min'], [1200, '20 min'], [3600, '60 min']];
+  const rows = ws.map(([w, l]) => { const a = bestRide(w, 0, 30), b = bestRide(w, 30, 60), c = bestRide(w, 60, 90); return { l, a, b, c }; }).filter(r => r.a.w || r.b.w || r.c.w);
+  card.hidden = !rows.length; if (!rows.length) return;
+  const arrow = (x, y) => !x || !y ? '—' : `<span style="color:${x >= y ? '#4ade80' : '#fb923c'}">${x >= y ? '▲ +' : '▼ '}${x - y} W</span>`;
+  const f = [0, 1, 2, 3, 4, 5].map(k => ({ k, w: Math.round(bestRide(1200, k * 30, k * 30 + 30).w * .95) })).reverse(), mx = Math.max(1, ...f.map(x => x.w));
+  $('#progTag').textContent = 'meilleurs efforts sur 30 jours';
+  $('#prog').innerHTML = `<div class="ctable">${rows.map(r => `<div class="crow"><span><b>${r.l}</b></span><span><b>${r.a.w || '—'}</b> W ${arrow(r.a.w, r.b.w)} <small>vs mois précédent (${r.b.w || '—'} W) · il y a 2 mois : ${r.c.w || '—'} W</small></span></div>`).join('')}</div>
+  <h3 class="ch">FTP estimé (95 % du meilleur 20 min) par mois</h3>${f.map(x => `<div class="wrow"><span class="wd">${x.k === 0 ? 'ce mois' : 'il y a ' + x.k + ' m'}</span><div class="wbar"><i style="width:${x.w / mx * 100}%"></i></div><span class="wv"><b>${x.w || '—'} W</b></span></div>`).join('')}`;
+}
+function renderCoach(m, plan) { renderToday(m, plan); renderBilan(); renderProg(m); }
 
 /* =====================================================================
    Démo : sorties synthétiques passées dans la même chaîne d'analyse
@@ -944,14 +1085,20 @@ function loadDemo() {
 /* =====================================================================
    Événements
    ===================================================================== */
-async function sendWorkoutToVI(i, copyOnly) {
-  const d = planCache?.week[i]; if (!d?.steps) return;
+function sendWorkoutToVI(i, copyOnly) { return sendSession(planCache?.week[i], copyOnly); }
+async function sendSession(d, copyOnly) {
+  if (!d?.steps) return;
   const plan = Rider.planLines(d.steps, M.ftp);
+  store.set('vento.lastSent', { t: Date.now(), title: d.title, kind: d.t, ftp: M.ftp, steps: d.steps });   // pour le bilan prévu / réalisé
   try { await navigator.clipboard.writeText(plan); } catch {}                         // copie de secours (bouton « Importer depuis Vento » dans VeloIndoor)
   if (copyOnly) { setStatus('Séance copiée : dans VeloIndoor, touche « Importer depuis Vento ».'); return; }
   Rider.sendToVeloIndoor({ v: 1, name: d.title, plan });
   setStatus('Envoi à VeloIndoor… si rien ne s\'ouvre, la séance est déjà copiée : ouvre VeloIndoor puis « Importer depuis Vento ».');
 }
+$('#today').addEventListener('click', e => {
+  const b = e.target.closest('[data-today]'); if (!b || !window.todayCache) return;
+  if (b.dataset.f === 'vi') sendSession(window.todayCache); else if (b.dataset.f === 'copy') sendSession(window.todayCache, true); else downloadSession(window.todayCache, b.dataset.f, 0);
+});
 $('#days').addEventListener('click', e => {
   const b = e.target.closest('[data-wk]'); if (!b) return;
   if (b.dataset.f === 'vi') sendWorkoutToVI(+b.dataset.wk); else if (b.dataset.f === 'copy') sendWorkoutToVI(+b.dataset.wk, true); else downloadWorkout(+b.dataset.wk, b.dataset.f);
