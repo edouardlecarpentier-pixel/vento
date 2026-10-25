@@ -10,6 +10,7 @@
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <style>
 :root{
   --bg:#0a0e13;--panel:#0f141b;--card:#151b24;--card2:#1a222d;--line:#232c39;--txt:#e6ebf2;--mut:#8b97a8;
@@ -193,6 +194,7 @@ details.more .search{margin-top:8px}
 .safectl .btn{width:100%}
 .safectl .btn.on{background:rgba(34,197,94,.2);border-color:#22c55e;color:#86efac}
 #safeLegend{margin-top:8px;font-size:11.5px;display:flex;flex-direction:column;gap:3px}
+#safeLegend[hidden]{display:none}
 #safeLegend i{display:inline-block;width:18px;height:4px;border-radius:2px;margin-right:7px;vertical-align:middle}
 #safeStatus{margin-top:6px;font-size:11.5px;color:var(--c1)}
 .safemode .leaflet-tile-pane{filter:grayscale(.9) brightness(.66) contrast(1.05)}
@@ -456,6 +458,8 @@ input:focus,select:focus{border-color:var(--a,var(--acc))}
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.22/leaflet-maplibre-gl.js"></script>
 <script src="rider.js"></script>
 <script>
 'use strict';
@@ -580,16 +584,26 @@ const state = {
    ===================================================================== */
 const map = L.map('map', { zoomControl: false, preferCanvas: true, worldCopyJump: true }).setView([46.7, 2.5], 6);
 L.control.zoom({ position: 'bottomright' }).addTo(map);
-const base = {
-  'Sombre': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, className: 'dark-tiles', attribution: '© OpenStreetMap' }),
-  'Vélo (CyclOSM)': L.tileLayer('https://{s}.tile-cyclosm.org/cyclosm/{z}/{x}/{y}.png', { subdomains: 'abc', maxZoom: 20, attribution: '© OpenStreetMap · CyclOSM' }),
-  'OpenStreetMap': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }),
-  'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Imagery © Esri' })
-};
+/* Cartes vectorielles modernes (OpenFreeMap + MapLibre GL, gratuites, sans clé) : nettes à tous les zooms, fluides.
+   Si le téléphone/navigateur n'a pas WebGL, on retombe sur les cartes « images » classiques. */
+const hasGL = (() => { try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')) && typeof L.maplibreGL === 'function'; } catch { return false; } })();
+const vec = style => L.maplibreGL({ style: `https://tiles.openfreemap.org/styles/${style}`, pane: 'tilePane', attribution: '© OpenStreetMap · OpenFreeMap · OpenMapTiles' });
+const base = {};
+if (hasGL) {
+  base['Moderne (vectorielle)'] = vec('liberty');
+  base['Clair épuré'] = vec('positron');
+  base['Sombre (vectorielle)'] = vec('dark');
+}
+base['Vélo (CyclOSM)'] = L.tileLayer('https://{s}.tile-cyclosm.org/cyclosm/{z}/{x}/{y}.png', { subdomains: 'abc', maxZoom: 20, attribution: '© OpenStreetMap · CyclOSM' });
+base['Relief (courbes de niveau)'] = L.tileLayer('https://tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '© OpenStreetMap · OpenTopoMap (CC-BY-SA)' });
+base['Satellite'] = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Imagery © Esri' });
+base['OpenStreetMap'] = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
+base['Sombre (classique)'] = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, className: 'dark-tiles', attribution: '© OpenStreetMap' });
 const overlays = {
   'Itinéraires vélo balisés': L.tileLayer('https://tile.waymarkedtrails.org/cycling/{z}/{x}/{y}.png', { maxZoom: 18, opacity: .8, attribution: '© waymarkedtrails.org' })
 };
-(base[store.get('vento.base', 'Vélo (CyclOSM)')] || base['Vélo (CyclOSM)']).addTo(map);
+const defaultBase = hasGL ? 'Moderne (vectorielle)' : 'Vélo (CyclOSM)';
+(base[store.get('vento.base', defaultBase)] || base[defaultBase]).addTo(map);
 L.control.layers(base, overlays, { position: 'topright', collapsed: true }).addTo(map);
 map.on('baselayerchange', e => store.set('vento.base', e.name));
 new ResizeObserver(() => { map.invalidateSize(); drawProfile(); }).observe($('#map'));
