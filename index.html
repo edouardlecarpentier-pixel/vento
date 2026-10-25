@@ -197,6 +197,19 @@ details.more .search{margin-top:8px}
 #safeStatus{margin-top:6px;font-size:11.5px;color:var(--c1)}
 .safemode .leaflet-tile-pane{filter:grayscale(.9) brightness(.66) contrast(1.05)}
 
+/* ---------- fenêtre d'envoi vers Garmin ---------- */
+.modal{position:fixed;inset:0;z-index:3000;background:rgba(3,6,10,.72);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:16px}
+.modal[hidden]{display:none}
+.sheet{width:min(440px,100%);max-height:92vh;overflow:auto;background:var(--card,#151b24);border:1px solid var(--line);border-top:3px solid var(--c5);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.sheet h3{margin:0;font-size:16px}
+.sheet p{margin:0;font-size:12.5px;word-break:break-all}
+.sheet .btn{width:100%;text-decoration:none;padding:12px 10px;font-size:14px;color:var(--txt)}
+.sheet .btn.primary{color:#061425}
+.sheet .btn[hidden]{display:none}
+.sheet .steps{margin:2px 0 0;padding-left:20px;font-size:12.5px;color:#c4ccd8}
+.sheet .steps li{margin:4px 0}
+@media (max-width:860px){.modal{align-items:flex-end;padding:0}.sheet{border-radius:18px 18px 0 0;width:100%}}
+
 /* ---------- côtes & profil ---------- */
 #climbs{margin-top:12px;display:flex;flex-direction:column;gap:4px}
 .climbhead{font-size:12px;color:var(--c7);margin-bottom:2px;font-weight:600}
@@ -424,6 +437,23 @@ input:focus,select:focus{border-color:var(--a,var(--acc))}
   </div>
 </main>
 <div id="toast"></div>
+
+<div id="sendModal" class="modal" hidden>
+  <div class="sheet" role="dialog" aria-labelledby="sendTitle">
+    <h3 id="sendTitle">🚴 Parcours prêt pour ton Garmin</h3>
+    <p class="mut" id="sendInfo"></p>
+    <button class="btn primary" id="sendDl">⬇ 1. Télécharger le GPX</button>
+    <a class="btn" id="sendWeb" href="https://connect.garmin.com/modern/courses" target="_blank" rel="noopener">🌐 2. Ouvrir Garmin Connect (import du parcours)</a>
+    <a class="btn" id="sendApp" hidden href="intent://connect.garmin.com/modern/#Intent;scheme=https;package=com.garmin.android.apps.connectmobile;S.browser_fallback_url=https%3A%2F%2Fconnect.garmin.com%2Fmodern%2Fcourses;end">📱 Ouvrir l'application Garmin Connect</a>
+    <button class="btn" id="sendShare" hidden>📤 Partager vers une autre application…</button>
+    <ol class="steps">
+      <li>Télécharge le GPX (bouton 1).</li>
+      <li>Dans Garmin Connect : <b>Parcours → Importer</b>, choisis le fichier dans <i>Téléchargements</i>.</li>
+      <li>Ouvre le parcours puis <b>Envoyer vers l'appareil</b> → ton Edge. Il arrive après synchronisation Bluetooth.</li>
+    </ol>
+    <button class="btn" id="sendClose">Fermer</button>
+  </div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="rider.js"></script>
@@ -1230,13 +1260,38 @@ function buildGPX() {
   for (const p of pts) x += `<trkpt lat="${p[0].toFixed(6)}" lon="${p[1].toFixed(6)}">${p[2] != null ? `<ele>${p[2].toFixed(1)}</ele>` : ''}</trkpt>\n`;
   return { xml: x + '</trkseg></trk>\n</gpx>\n', name, count: pts.length };
 }
+let lastGpx = null;
+function downloadGpx(g) {
+  const a = document.createElement('a'), url = URL.createObjectURL(new Blob([g.xml], { type: 'application/gpx+xml' }));
+  a.href = url; a.download = g.fname; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+  toast(`GPX téléchargé (${g.count} points)`);
+}
 function exportGPX() {
   const g = buildGPX(); if (!g) return toast('Trace d\'abord un itinéraire');
-  const a = document.createElement('a'), url = URL.createObjectURL(new Blob([g.xml], { type: 'application/gpx+xml' }));
-  a.href = url; a.download = g.name.normalize('NFD').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_').slice(0, 60) + '.gpx';
-  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
-  toast(`GPX exporté (${g.count} points) — prêt pour Garmin Connect / Huawei Santé`);
+  g.fname = g.name.normalize('NFD').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '_').slice(0, 60) + '.gpx';
+  lastGpx = g;
+  if (!matchMedia('(pointer: coarse)').matches) downloadGpx(g);          // PC : téléchargement immédiat ; téléphone : on propose les options
+  const rt = state.route;
+  $('#sendInfo').textContent = `${g.name} · ${fmtKm(rt.total)} km · ${g.count} points · ${g.fname}`;
+  $('#sendShare').hidden = !navigator.share;
+  $('#sendApp').hidden = !/Android/i.test(navigator.userAgent);
+  $('#sendModal').hidden = false;
 }
+async function shareGpx() {                                               // feuille de partage Android (Garmin Connect, Fichiers, Drive…)
+  if (!lastGpx) return;
+  for (const type of ['application/gpx+xml', 'application/octet-stream', 'text/xml', 'text/plain']) {
+    const file = new File([lastGpx.xml], lastGpx.fname, { type });
+    if (navigator.canShare?.({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: lastGpx.name }); } catch (e) { if (e.name !== 'AbortError') toast('Partage impossible : utilise « Télécharger »'); }
+      return;
+    }
+  }
+  toast('Ton navigateur ne partage pas les fichiers GPX : utilise « Télécharger »');
+}
+$('#sendDl').onclick = () => lastGpx && downloadGpx(lastGpx);
+$('#sendShare').onclick = shareGpx;
+$('#sendClose').onclick = () => { $('#sendModal').hidden = true; };
+$('#sendModal').addEventListener('click', e => { if (e.target.id === 'sendModal') $('#sendModal').hidden = true; });
 function importGPX(text) {
   const doc = new DOMParser().parseFromString(text, 'application/xml');
   if (doc.querySelector('parsererror')) return toast('Fichier GPX illisible');
