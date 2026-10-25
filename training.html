@@ -82,6 +82,8 @@ td.n,th.n{text-align:right;font-family:var(--mono)}
 .wsvg{display:block;width:100%;height:56px;margin:10px 0 8px;border-radius:8px;background:#0a0f15}
 .wbtns{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--mut)}
 .wbtns span{margin-right:2px}
+.btn.rouvy{background:linear-gradient(135deg,#f97316,#ef4444);border-color:transparent;color:#fff;font-weight:700}
+.wk .steps{margin:6px 0 10px 18px;padding:0;color:#c4ccd8}.wk .steps li{margin:4px 0}
 .wk{margin-top:14px;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--inp);font-size:13px}
 .wk p{margin:6px 0 10px;color:#c4ccd8}
 
@@ -226,9 +228,15 @@ h3.ch small{color:var(--mut);font-weight:400}
       <h2><span><span class="ic">🗓️</span>Plan des 7 prochains jours</span><span class="tag" id="planTag"></span></h2>
       <div class="days" id="days"></div>
       <div class="wk" id="wkHelp" hidden>
-        <b>Séances pour ton home trainer</b>
-        <p>Chaque séance se télécharge en fichier d'entraînement : <b>ZWO</b> (Zwift, MyWhoosh, TrainingPeaks Virtual, Intervals.icu…), <b>MRC</b> (en % du FTP) ou <b>ERG</b> (en watts). Les intensités sont calculées pour un <b>FTP de <span id="wkFtp"></span> W</b> : règle le même FTP dans ton application de home trainer. La résistance suit alors automatiquement les paliers de la séance.</p>
-        <button class="btn sm" id="wkAll">⬇ Toute la semaine (ZWO)</button>
+        <b>🚴 Séances pour ROUVY (home trainer)</b>
+        <p>Chaque séance se télécharge en fichier d'entraînement que <b>ROUVY</b> sait importer (.erg, .mrc ou .zwo). Le bouton <b>ROUVY (.erg)</b> donne les <b>watts exacts</b> calculés pour un <b>FTP de <span id="wkFtp"></span> W</b>. Les formats ZWO et MRC sont en % du FTP : dans ce cas, règle le même FTP dans ton profil ROUVY.</p>
+        <ol class="steps">
+          <li>Télécharge la séance (bouton « ROUVY (.erg) »).</li>
+          <li>Sur <a href="https://riders.rouvy.com/" target="_blank" rel="noopener">le portail ROUVY</a> : onglet <b>Workouts</b> → <b>Import from file</b>. Dans l'application ROUVY : onglet Workouts → « Add your own workout » → <b>Import from file</b>.</li>
+          <li>Ouvre la séance dans ROUVY et touche <b>Change</b> pour choisir le parcours à rouler pendant les paliers.</li>
+        </ol>
+        <p style="margin-bottom:0">Besoin d'un parcours précis ? Dans le <a href="index.html">planificateur</a>, exporte ton tracé en GPX puis importe-le dans le portail ROUVY (onglet <b>Routes</b> → Import from file).</p>
+        <button class="btn sm" id="wkAll" style="margin-top:10px">⬇ Toute la semaine (.erg)</button>
       </div>
       <p class="disc">Ces conseils sont des repères généraux calculés à partir de tes données, pas un programme de coach personnalisé. Écoute ton corps, adapte en cas de fatigue ou de douleur et demande un avis médical au moindre doute.</p>
     </section>
@@ -777,7 +785,7 @@ function render() {
     planCache = plan;
     $('#days').innerHTML = plan.week.map((d, i) => {
       const day = new Date(Date.now() + (i + 1) * DAY).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric' });
-      const wk = d.steps ? `${workoutSvg(d.steps)}<div class="wbtns"><span>Home trainer :</span><button class="btn sm" data-wk="${i}" data-f="zwo" title="Zwift, MyWhoosh, TrainingPeaks Virtual, Intervals.icu…">⬇ ZWO</button><button class="btn sm" data-wk="${i}" data-f="mrc" title="% du FTP : TrainerRoad, Golden Cheetah…">⬇ MRC</button><button class="btn sm" data-wk="${i}" data-f="erg" title="Watts absolus pour ${M.ftp} W de FTP">⬇ ERG</button></div>` : '';
+      const wk = d.steps ? `${workoutSvg(d.steps)}<div class="wbtns"><button class="btn sm rouvy" data-wk="${i}" data-f="erg" title="Fichier .erg en watts exacts (pour ${M.ftp} W de FTP) : à importer dans ROUVY">⬇ ROUVY (.erg)</button><button class="btn sm" data-wk="${i}" data-f="zwo" title="% du FTP réglé dans ROUVY">ZWO</button><button class="btn sm" data-wk="${i}" data-f="mrc" title="% du FTP réglé dans ROUVY">MRC</button></div>` : '';
       return `<div class="day" style="--d:${d.c}"><h3><span>${day}</span><span class="k">${d.min ? fmtDur(d.min * 60) : ''}</span></h3><h4>${d.title}</h4>${d.pw ? `<div class="k">${d.pw[0]}–${d.pw[1]} W · ${d.hr[0]}–${d.hr[1]} bpm · ~${d.tss} TSS</div>` : ''}<p>${d.desc}</p>${wk}</div>`;
     }).join('');
     $('#wkHelp').hidden = false; $('#wkFtp').textContent = m.ftp;
@@ -822,7 +830,7 @@ function loadDemo() {
    Événements
    ===================================================================== */
 $('#days').addEventListener('click', e => { const b = e.target.closest('[data-wk]'); if (b) downloadWorkout(+b.dataset.wk, b.dataset.f); });
-$('#wkAll').onclick = () => { (planCache?.week || []).forEach((d, i) => { if (d.steps) setTimeout(() => downloadWorkout(i, 'zwo'), i * 450); }); };
+$('#wkAll').onclick = () => { (planCache?.week || []).forEach((d, i) => { if (d.steps) setTimeout(() => downloadWorkout(i, 'erg'), i * 450); }); };
 $('#btnConnect').onclick = connect;
 $('#btnSync').onclick = () => syncActivities(25);
 $('#btnMore').onclick = async () => { try { setBar(0); await detailBatch(25); } catch (e) { setBar(null); setStatus(e.message, true); } refresh(); };

@@ -578,6 +578,8 @@ input:focus,select:focus{border-color:var(--a,var(--acc))}
     <p class="mut" id="sendInfo"></p>
     <button class="btn primary" id="sendDl">⬇ 1. Télécharger le GPX</button>
     <a class="btn" id="sendWeb" href="https://connect.garmin.com/modern/courses" target="_blank" rel="noopener">🌐 2. Ouvrir Garmin Connect (import du parcours)</a>
+    <a class="btn" id="sendRouvy" href="https://riders.rouvy.com/" target="_blank" rel="noopener">🏠 Home trainer : ouvrir le portail ROUVY</a>
+    <p class="mut" id="sendRouvyNote" style="font-size:12px"></p>
     <a class="btn" id="sendApp" hidden href="intent://connect.garmin.com/modern/#Intent;scheme=https;package=com.garmin.android.apps.connectmobile;S.browser_fallback_url=https%3A%2F%2Fconnect.garmin.com%2Fmodern%2Fcourses;end">📱 Ouvrir l'application Garmin Connect</a>
     <button class="btn" id="sendShare" hidden>📤 Partager vers une autre application…</button>
     <ol class="steps">
@@ -1446,6 +1448,8 @@ function exportGPX() {
   if (!matchMedia('(pointer: coarse)').matches) downloadGpx(g);          // PC : téléchargement immédiat ; téléphone : on propose les options
   const rt = state.route;
   $('#sendInfo').textContent = `${g.name} · ${fmtKm(rt.total)} km · ${g.count} points · ${g.fname}`;
+  $('#sendRouvy').hidden = isFoot(); $('#sendRouvyNote').hidden = isFoot();
+  $('#sendRouvyNote').textContent = rt.total > 200000 ? '⚠ Plus de 200 km : ROUVY refusera ce fichier (limite 200 km / 10 Mo).' : 'ROUVY : portail → Routes → « Import from file » avec ce GPX, lissage d\'altitude désactivé (fichier créé avec un planificateur).';
   $('#sendShare').hidden = !navigator.share;
   $('#sendApp').hidden = !/Android/i.test(navigator.userAgent);
   $('#sendModal').hidden = false;
