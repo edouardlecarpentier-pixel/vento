@@ -67,7 +67,13 @@ const Rider = (() => {
 
   const KEY = 'vento.rider';
   const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || null; } catch { return null; } };
-  const save = o => { try { localStorage.setItem(KEY, JSON.stringify(o)); } catch {} };
+  const save = o => {                          // n'écrit pas si rien n'a changé (évite des synchronisations inutiles)
+    try {
+      const cur = load(), strip = x => JSON.stringify({ ...x, updated: 0 });
+      if (cur && strip(cur) === strip(o)) return;
+      localStorage.setItem(KEY, JSON.stringify(o));
+    } catch {}
+  };
   const clear = () => { try { localStorage.removeItem(KEY); } catch {} };
 
   return { solveSpeed, cdaFrom, POWER_ZONES, HR_ZONES, powerZone, EFFORTS, durability, targetPower, detectClimbs, climbCat, load, save, clear, G, RHO, EFF };

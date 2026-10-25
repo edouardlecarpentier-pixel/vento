@@ -259,19 +259,75 @@ input:focus,select:focus{border-color:var(--a,var(--acc))}
 .pitem:hover{background:color-mix(in srgb,var(--c3) 12%,#0d1219)}
 .hint b{color:var(--c1)}
 
+/* ---------- téléphone : carte plein écran + panneau coulissant à onglets + barre d'actions ---------- */
+#sheetHandle,#tabs,#bar{display:none}
 @media (max-width:860px){
-  body{grid-template-columns:1fr;grid-template-rows:62vh 1fr;overflow:hidden}
-  #stage{order:1}
-  #panel{order:2;border-right:0;border-top:1px solid var(--line)}
-  #profileWrap{height:120px}
+  html,body{height:100%;overflow:hidden}
+  body{display:block}
+  #stage{position:fixed;inset:0;display:block}
+  #map{position:absolute;inset:0}
+  #panel{position:fixed;left:0;right:0;bottom:calc(58px + env(safe-area-inset-bottom));height:var(--sheet,46vh);max-height:calc(100dvh - 130px);z-index:900;
+    border:1px solid var(--line);border-radius:20px 20px 0 0;box-shadow:0 -12px 40px rgba(0,0,0,.55);padding:0 12px 24px;gap:12px;overflow-y:auto;overscroll-behavior:contain;
+    transition:height .22s ease;background:var(--panel)}
+  #panel.dragging{transition:none}
+  #panel[data-sheet=peek]{--sheet:98px}#panel[data-sheet=half]{--sheet:46vh}#panel[data-sheet=full]{--sheet:calc(100dvh - 130px)}
+  #sheetHandle{display:grid;place-items:center;height:26px;position:sticky;top:0;z-index:5;background:var(--panel);cursor:grab;touch-action:none;margin:0 -12px;border-radius:20px 20px 0 0}
+  #sheetHandle i{width:46px;height:5px;border-radius:3px;background:#3a4658}
+  #tabs{display:flex;gap:6px;overflow-x:auto;position:sticky;top:26px;z-index:5;padding:2px 0 10px;background:var(--panel);scrollbar-width:none}
+  #tabs::-webkit-scrollbar{display:none}
+  #tabs button{flex:1 0 auto;min-width:60px;min-height:50px;border-radius:13px;background:var(--card2);border:1px solid var(--line);color:var(--mut);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:19px;line-height:1.1;cursor:pointer}
+  #tabs button span{font-size:10.5px;margin-top:1px}
+  #tabs button.on{color:var(--c1);border-color:var(--c1);background:rgba(34,211,238,.13)}
+  .brand,.foot{display:none}
+  #panel[data-active=trajet] .card:not([data-tab=trajet]),#panel[data-active=parcours] .card:not([data-tab=parcours]),#panel[data-active=vent] .card:not([data-tab=vent]),
+  #panel[data-active=taf] .card:not([data-tab=taf]),#panel[data-active=poi] .card:not([data-tab=poi]),#panel[data-active=moi] .card:not([data-tab=moi]){display:none}
+  /* gros éléments tactiles, texte 16 px (pas de zoom automatique du clavier) */
+  input[type=text],input[type=number],input[type=datetime-local],input[type=time],input[type=password],select{font-size:16px;min-height:46px}
+  .btn{min-height:44px}.btn.sm{min-height:44px;min-width:44px;font-size:16px}
+  .toolbar{grid-template-columns:1fr 1fr!important}.toolbar #btnUndo,.toolbar #btnRedo,.toolbar #btnLoop{display:none}   /* déjà dans la barre du bas */
+  #toast{bottom:calc(78px + env(safe-area-inset-bottom))}
+  #panel>*{flex:none}                       /* sinon les onglets et cartes se compriment dans le panneau */
+  .legend{grid-template-columns:1fr}
+  .da{padding-right:0}.swap{display:none}                 /* « Inverser » reste dans la rangée d'actions */
+  .dafield{flex-wrap:wrap}.dafield input{flex:1 1 calc(100% - 38px)}.dafield .btn{flex:1}.placeRow{flex-wrap:wrap}.placeRow input{flex:1 1 calc(100% - 38px)}.placeRow .btn{flex:1}
+  #btnSafe{display:none}.safectl{padding:6px 8px}.safectl:has(#safeLegend[hidden]){display:none}
+  .tile b{font-size:21px}
+  .check{min-height:44px}.check input{width:22px;height:22px}
+  .chip{padding:10px 12px;font-size:14px}
+  /* barre d'actions fixe en bas */
+  #bar{display:flex;position:fixed;left:0;right:0;bottom:0;height:calc(58px + env(safe-area-inset-bottom));padding-bottom:env(safe-area-inset-bottom);z-index:950;background:#0c1118;border-top:1px solid var(--line)}
+  #bar button{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;background:none;border:0;color:var(--txt);font-size:21px;line-height:1.1;cursor:pointer}
+  #bar button span{font-size:10.5px;color:var(--mut);margin-top:2px}
+  #bar button.primary{color:#061425;background:linear-gradient(135deg,var(--c1),var(--c2));margin:7px 8px;border-radius:14px;flex:1.3}
+  #bar button.primary span{color:#061425;font-weight:700}
+  #bar button:disabled{opacity:.35}
+  #bar button.on{color:#86efac}
+  /* carte */
+  #fab{top:8px;transform:translateX(-50%) scale(.92)}
+  #fab .btn{display:none}#fab{padding:6px 16px}
   #hint{top:64px}
-  .leaflet-control-layers{margin-top:60px!important}
+  .leaflet-control-zoom{display:none}
+  .leaflet-control-layers{margin-top:62px!important}
+  .leaflet-control-attribution{font-size:9px;max-width:60vw}
+  .wp div,.wp{transform:none}.wp{width:34px;height:34px;font-size:14px}
+  #profileWrap{position:relative;height:170px;border:1px solid var(--line);border-radius:12px;margin-top:12px;overflow:hidden}
+  #profTitle{left:12px}
+  .modal .sheet{padding-bottom:calc(16px + env(safe-area-inset-bottom))}
 }
 </style>
 </head>
 <body>
 
-<aside id="panel">
+<aside id="panel" data-sheet="half" data-active="trajet">
+  <div id="sheetHandle" role="button" aria-label="Agrandir ou réduire le panneau"><i></i></div>
+  <nav id="tabs" aria-label="Sections">
+    <button data-tab="trajet" class="on">🧭<span>Trajet</span></button>
+    <button data-tab="parcours">📏<span>Parcours</span></button>
+    <button data-tab="vent">💨<span>Vent</span></button>
+    <button data-tab="taf">🏠<span>Vélo-taf</span></button>
+    <button data-tab="poi">📍<span>POI</span></button>
+    <button data-tab="moi">⚙️<span>Moi</span></button>
+  </nav>
   <div class="brand">
     <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="16" fill="#0a0e13" stroke="#22d3ee" stroke-width="2"/><path d="M12 44c8-2 12-10 20-10s10 8 20 4" fill="none" stroke="#22d3ee" stroke-width="4" stroke-linecap="round"/><path d="M14 24h22a6 6 0 1 0-6-6M14 31h30a6 6 0 1 1-6 6" fill="none" stroke="#e6ebf2" stroke-width="3" stroke-linecap="round" opacity=".85"/></svg>
     <div><b>VENTO</b><small>Planificateur vélo · vent · points d'intérêt</small></div>
@@ -422,6 +478,31 @@ input:focus,select:focus{border-color:var(--a,var(--acc))}
     <div id="saved"></div>
   </section>
 
+  <section class="card" id="cardSync">
+    <h2><span><span class="ic">🔄</span>Synchronisation téléphone ↔ PC</span> <span class="tag" id="syncTag"></span></h2>
+    <p class="hint" id="syncState" style="margin:0 0 8px">Pas encore activée : tes données restent sur cet appareil.</p>
+    <details>
+      <summary>Comment l'activer (2 minutes)</summary>
+      <ol class="steps">
+        <li>Ouvre <a href="https://github.com/settings/tokens/new?scopes=gist&description=Vento%20sync" target="_blank" rel="noopener">cette page GitHub</a> : un jeton « classic » avec seulement la case <b>gist</b> est pré-rempli. Choisis une expiration, valide et copie le jeton.</li>
+        <li>Colle-le ci-dessous et invente une <b>phrase secrète</b> (8 caractères minimum). Elle chiffre tes données ; il faut la <b>même</b> sur tous tes appareils.</li>
+        <li>Clique « Activer ». Sur l'autre appareil, fais pareil avec le même jeton et la même phrase.</li>
+      </ol>
+    </details>
+    <label class="f">Jeton GitHub (permission gist)<input id="syncToken" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+    <label class="f" style="margin-top:8px">Phrase secrète<input id="syncPass" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+    <div class="row" style="margin-top:10px">
+      <button class="btn primary grow" id="syncOn">Activer / synchroniser</button>
+      <button class="btn grow" id="syncOff">Désactiver</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button class="btn grow" id="bkSave">💾 Sauvegarder (fichier)</button>
+      <button class="btn grow" id="bkLoad">📂 Restaurer</button>
+    </div>
+    <input type="file" id="bkFile" accept=".json,application/json" hidden>
+    <p class="hint">Synchronisés : maison, travail, vélo-taf, parcours sauvegardés et profil. Les données sont chiffrées (AES-256) dans ton navigateur avant d'être déposées dans un <b>Gist secret</b> de ton compte GitHub. Les identifiants Strava ne sont jamais synchronisés. Le fichier de sauvegarde, lui, n'est pas chiffré.</p>
+  </section>
+
   <div class="foot">
     Données : © contributeurs <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · routage <a href="https://brouter.de" target="_blank" rel="noopener">BRouter</a> / OSM Germany · météo &amp; altitude <a href="https://open-meteo.com" target="_blank" rel="noopener">Open-Meteo</a> · POI Overpass API · recherche Nominatim.
     Les durées et le vent sont des estimations : reste prudent sur la route.
@@ -438,6 +519,13 @@ input:focus,select:focus{border-color:var(--a,var(--acc))}
     <canvas id="prof"></canvas>
   </div>
 </main>
+<nav id="bar" aria-label="Actions rapides">
+  <button id="mUndo" aria-label="Retour">↶<span>Retour</span></button>
+  <button id="mRedo" aria-label="Rétablir">↷<span>Rétablir</span></button>
+  <button id="mLoop" aria-label="Boucle">⟲<span>Boucle</span></button>
+  <button id="mSafe" aria-label="Carte des pistes cyclables">🛡️<span>Pistes</span></button>
+  <button id="mGpx" class="primary" aria-label="Exporter en GPX">⬇<span>GPX</span></button>
+</nav>
 <div id="toast"></div>
 
 <div id="sendModal" class="modal" hidden>
@@ -461,6 +549,7 @@ input:focus,select:focus{border-color:var(--a,var(--acc))}
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.22/leaflet-maplibre-gl.js"></script>
 <script src="rider.js"></script>
+<script src="sync.js"></script>
 <script>
 'use strict';
 /* =====================================================================
@@ -1439,7 +1528,7 @@ function loadCycView() {
 }
 function setSafeMode(on) {
   state.safeMode = on; map.getContainer().classList.toggle('safemode', on);
-  $('#btnSafe').classList.toggle('on', on); $('#safeLegend').hidden = !on;
+  $('#btnSafe').classList.toggle('on', on); $('#mSafe')?.classList.toggle('on', on); $('#safeLegend').hidden = !on;
   if (on) { cycGroup.addTo(map); cycTiles.forEach(lg => cycGroup.addLayer(lg)); state.colorBy = state.route?.safety ? 'safety' : state.colorBy; if (state.route) { renderRoute(); renderSafety(); } loadCycView(); }
   else { map.removeLayer(cycGroup); cycGroup.clearLayers(); updateCycStatus(); }
   store.set('vento.safeMode', on);
@@ -1452,7 +1541,7 @@ const SafeCtl = L.Control.extend({
     L.DomEvent.disableClickPropagation(d); L.DomEvent.disableScrollPropagation(d); return d;
   }
 });
-new SafeCtl({ position: 'bottomleft' }).addTo(map);
+new SafeCtl({ position: matchMedia('(max-width: 860px)').matches ? 'topleft' : 'bottomleft' }).addTo(map);
 $('#btnSafe').onclick = () => setSafeMode(!state.safeMode);
 map.on('moveend', () => { clearTimeout(cycTimer); cycTimer = setTimeout(loadCycView, 400); });
 
@@ -1513,7 +1602,7 @@ bindSearch($('#qEnd'), $('#daResults'), setEnd);
 document.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => startPick(b.dataset.pick));
 document.querySelectorAll('[data-place]').forEach(b => b.onclick = () => {
   const [slot, kind] = b.dataset.place.split(':'), p = state.places[kind];
-  if (!p) { toast(`Enregistre d'abord ${kind === 'home' ? 'ta maison' : 'ton travail'} dans la carte « Vélo-taf »`); $('#cardCommute').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+  if (!p) { toast(`Enregistre d'abord ${kind === 'home' ? 'ta maison' : 'ton travail'} dans la carte « Vélo-taf »`); if (mq.matches) setTab('taf'); else $('#cardCommute').scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
   (slot === 'start' ? setStart : setEnd)(p, p.label);
 });
 
@@ -1603,6 +1692,9 @@ function syncButtons() {
   $('#btnLoop').classList.toggle('on', state.loop);
   $('#btnLoop').disabled = state.wps.length < 2;
   $('#btnRev').disabled = $('#btnSwap').disabled = state.wps.length < 2; $('#btnClear').disabled = !state.wps.length;
+  $('#mUndo').disabled = !state.history.length; $('#mRedo').disabled = !state.redo.length;
+  $('#mLoop').classList.toggle('on', state.loop); $('#mLoop').disabled = state.wps.length < 2;
+  $('#mGpx').disabled = !state.route;
 }
 function persist() {
   syncButtons(); store.set('vento.settings', state.set);
@@ -1689,7 +1781,41 @@ $('#routing').value = state.set.routing; $('#power').value = state.set.power; $(
 $('#effort').innerHTML = Object.entries(Rider.EFFORTS).map(([k, v]) => `<option value="${k}">${esc(v.label)}</option>`).join('');
 $('#bike').value = state.set.bike; $('#radius').value = String(state.set.radius); $('#poiGpx').checked = !!state.set.poiGpx;
 renderSaved();
-document.querySelectorAll('#panel .card').forEach((c, i) => c.classList.add(['c1', 'c5', 'c2', 'c6', 'c4', 'c7', 'c3', 'c1'][i] || 'c1'));
+const cards = [...document.querySelectorAll('#panel .card')];
+cards.forEach((c, i) => { c.classList.add(['c1', 'c5', 'c2', 'c6', 'c4', 'c7', 'c3', 'c1', 'c6'][i] || 'c1'); c.dataset.tab = ['trajet', 'taf', 'parcours', 'vent', 'vent', 'moi', 'poi', 'moi', 'moi'][i] || 'moi'; });
+
+/* ---------- téléphone : onglets, panneau coulissant, barre d'actions ---------- */
+const mq = matchMedia('(max-width: 860px)'), panel = $('#panel');
+function setSheet(s) { panel.dataset.sheet = s; panel.style.removeProperty('--sheet'); store.set('vento.sheet', s); }
+function setTab(t, open = true) {
+  panel.dataset.active = t; document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  if (open && panel.dataset.sheet === 'peek') setSheet('half');
+  panel.scrollTop = 0; store.set('vento.tab', t); setTimeout(drawProfile, 260);
+}
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
+{
+  const handle = $('#sheetHandle'); let drag = null;
+  handle.addEventListener('pointerdown', e => { handle.setPointerCapture(e.pointerId); drag = { y: e.clientY, h: panel.getBoundingClientRect().height, moved: false }; panel.classList.add('dragging'); });
+  handle.addEventListener('pointermove', e => {
+    if (!drag) return; const dy = drag.y - e.clientY; if (Math.abs(dy) > 4) drag.moved = true;
+    panel.style.setProperty('--sheet', clamp(drag.h + dy, 98, innerHeight - 130) + 'px');
+  });
+  const endDrag = () => {
+    if (!drag) return; panel.classList.remove('dragging');
+    const h = panel.getBoundingClientRect().height, max = innerHeight - 130;
+    setSheet(!drag.moved ? { peek: 'half', half: 'full', full: 'peek' }[panel.dataset.sheet] : h < 200 ? 'peek' : h < max * .72 ? 'half' : 'full');
+    drag = null; setTimeout(drawProfile, 260);
+  };
+  handle.addEventListener('pointerup', endDrag); handle.addEventListener('pointercancel', endDrag);
+}
+function placeProfile() {                         // le profil d'altitude se range dans l'onglet « Parcours » sur téléphone
+  const pw = $('#profileWrap'); (mq.matches ? cards[2] : $('#stage')).append(pw);
+  setTimeout(() => { map.invalidateSize(); drawProfile(); }, 60);
+}
+mq.addEventListener('change', placeProfile); placeProfile();
+panel.dataset.sheet = store.get('vento.sheet', 'half'); setTab(store.get('vento.tab', 'trajet'), false);
+$('#mUndo').onclick = undo; $('#mRedo').onclick = redo; $('#mLoop').onclick = () => $('#btnLoop').click();
+$('#mSafe').onclick = () => setSafeMode(!state.safeMode); $('#mGpx').onclick = exportGPX;
 $('#tAller').value = state.commute.aller; $('#tRetour').value = state.commute.retour; $('#commuteSafe').checked = state.commute.safe !== false;
 if (store.get('vento.safeMode', false)) setSafeMode(true);
 {

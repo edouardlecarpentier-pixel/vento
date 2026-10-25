@@ -19,7 +19,9 @@ Application web (PWA) pour préparer ses sorties à vélo : **vent**, **pistes c
 - **Vélo-taf** : enregistre maison et travail, compare chaque jour le vent et la durée aller / retour.
 - **Temps estimé** à partir de ta puissance (profil Strava), côtes détectées, météo.
 - **Points d'intérêt** : eau, boulangeries, cafés, vélo, gares… (Overpass).
-- **Export / import GPX**, sauvegarde locale des parcours.
+- **Export / import GPX**, sauvegarde locale des parcours ; sur Android, fenêtre d'envoi vers Garmin Connect.
+- **Interface téléphone** : carte plein écran, panneau coulissant à onglets (Trajet, Parcours, Vent, Vélo-taf, POI, Moi) et barre d'actions en bas (Retour, Rétablir, Boucle, Pistes, GPX).
+- **Synchronisation téléphone ↔ PC** (onglet « Moi ») : maison, travail, vélo-taf, parcours sauvegardés et profil, chiffrés (AES-256) dans le navigateur puis déposés dans un **Gist secret** de ton GitHub (jeton avec la seule permission `gist` + phrase secrète). Les identifiants Strava ne sont jamais synchronisés.
 - **Entraînement** (`training.html`) : FTP, courbe de puissance, forme/fatigue, zones, côtes, conseils et plan de la semaine.
 
 ## Données et vie privée
