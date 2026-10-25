@@ -89,6 +89,17 @@ select{color-scheme:dark}
 .hb{width:100%;border-radius:3px 3px 1px 1px;background:var(--c);opacity:.75;min-height:4px;transition:.15s}
 .hcol:hover .hb{opacity:1}
 .hcol.sel .hb{opacity:1;outline:2px solid #fff;outline-offset:1px}
+#v3d{position:fixed;inset:0;z-index:3500;background:#05080d;display:flex;flex-direction:column}
+#v3d[hidden]{display:none}
+#v3bar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:8px 12px;background:#0c1118;border-bottom:1px solid var(--line);color:var(--txt);font-size:13px}
+#v3bar .seg{display:flex;gap:4px}#v3bar .seg button{padding:6px 10px;border-radius:9px;background:var(--card2);border:1px solid var(--line);color:var(--mut);cursor:pointer}
+#v3bar .seg button.on{color:var(--c1);border-color:var(--c1)}
+#v3bar label{display:flex;gap:6px;align-items:center;color:var(--mut)}
+#v3bar #v3close{margin-left:auto}
+#v3bar .btn,#v3bar .seg button{min-height:36px!important;min-width:0!important;font-size:13.5px!important;padding:4px 10px}
+#v3bar{padding:6px 10px;gap:6px 10px}#v3bar input[type=range]{width:110px}
+#v3map{flex:1;min-height:0}
+#v3hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);background:rgba(8,14,22,.8);color:#cbd5e1;padding:6px 12px;border-radius:999px;font-size:12px;pointer-events:none}
 .hcol.star span{color:#fbbf24;font-weight:700}.hcol.star .hb{box-shadow:0 0 0 2px #fbbf24}
 .hcol span{font-family:var(--mono);font-size:9.5px;color:var(--mut)}
 .hcol em{font-style:normal;font-size:9px;line-height:1;height:9px}
@@ -427,6 +438,7 @@ input:focus,select:focus{border-color:var(--a,var(--acc))}
       <div class="tile"><small>Alt. max</small><b id="tMax">—</b></div>
     </div>
     <div class="seg" id="colorBy"><span>Couleur du tracé</span><button data-v="wind">💨 Vent</button><button data-v="safety">🛡️ Sécurité</button></div>
+    <button class="btn" id="btn3d" style="width:100%;margin-top:10px" title="Relief, bâtiments en volume, survol du parcours">🏔️ Voir le parcours en 3D</button>
     <div id="safety"></div>
     <div id="climbs"></div>
   </section>
@@ -573,6 +585,18 @@ input:focus,select:focus{border-color:var(--a,var(--acc))}
     <button class="btn" id="upoiDel">🗑 Supprimer ce point</button>
     <button class="btn" id="upoiCancel">Annuler</button>
   </div>
+</div>
+
+<div id="v3d" hidden>
+  <div id="v3bar">
+    <b>🏔️ Vue 3D</b>
+    <div class="seg"><button id="v3sat" class="on">Satellite</button><button id="v3plan">Plan</button></div>
+    <label>Relief <input id="v3ex" type="range" min="1" max="3" step=".25" value="1.5"></label>
+    <button class="btn sm primary" id="v3fly">▶ Survol</button>
+    <button class="btn sm" id="v3close">✕ Fermer</button>
+  </div>
+  <div id="v3map"></div>
+  <div id="v3hint">Glisse pour tourner · Ctrl + glisser (ou deux doigts) pour incliner · molette pour zoomer</div>
 </div>
 
 <div id="smartModal" class="modal" hidden>
@@ -743,15 +767,48 @@ L.control.zoom({ position: 'bottomright' }).addTo(map);
    Si le téléphone/navigateur n'a pas WebGL, on retombe sur les cartes « images » classiques. */
 const hasGL = (() => { try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')) && typeof L.maplibreGL === 'function'; } catch { return false; } })();
 const vec = style => L.maplibreGL({ style: `https://tiles.openfreemap.org/styles/${style}`, pane: 'tilePane', attribution: '© OpenStreetMap · OpenFreeMap · OpenMapTiles' });
+/* Satellite détaillé : image Esri en dessous, par-dessus les routes, noms de rues, lieux et POI d'OpenFreeMap (style « liberty » retouché),
+   et les pistes cyclables / voies vertes en vert épais. buildings:true garde les bâtiments en volume (vue 3D). */
+const ESRI_SAT = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+const IGN_ORTHO = 'https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&FORMAT=image/jpeg&TILEMATRIXSET=PM&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}';
+const FR_BOUNDS = [-5.4, 41.2, 9.8, 51.2];     // France métropolitaine : l'orthophoto IGN (≈ 20 cm) y remplace l'image mondiale
+function hybridize(gl, { buildings = false } = {}) {
+  const run = () => {
+    if (gl.getSource('sat')) return;
+    const layers = gl.getStyle().layers, hide = id => gl.setLayoutProperty(id, 'visibility', 'none');
+    gl.addSource('sat', { type: 'raster', tiles: [ESRI_SAT], tileSize: 256, maxzoom: 19, attribution: 'Imagery © Esri' });
+    gl.addLayer({ id: 'sat', type: 'raster', source: 'sat' }, layers[0].id);
+    gl.addSource('ign', { type: 'raster', tiles: [IGN_ORTHO], tileSize: 256, maxzoom: 19, bounds: FR_BOUNDS, attribution: 'Orthophotos © IGN' });
+    gl.addLayer({ id: 'ign', type: 'raster', source: 'ign' }, layers[0].id);
+    for (const l of layers) {
+      const id = l.id;
+      if (l.type === 'background' || l.type === 'fill' || (l.type === 'raster' && id !== 'sat') || id === 'building' || (id === 'building-3d' && !buildings) || /^boundary|casing|one_way|hatching|rail|shield|aeroway|area_pattern/.test(id) || (l.type === 'line' && /^waterway/.test(id))) { hide(id); continue; }
+      if (l.type === 'line') { gl.setPaintProperty(id, 'line-color', /path|pedestrian/.test(id) ? '#e2e8f0' : '#ffffff'); gl.setPaintProperty(id, 'line-opacity', /path|pedestrian/.test(id) ? .55 : .8); }
+      else if (l.type === 'symbol') { gl.setPaintProperty(id, 'text-color', '#ffffff'); gl.setPaintProperty(id, 'text-halo-color', 'rgba(8,14,22,.92)'); gl.setPaintProperty(id, 'text-halo-width', 1.6); }
+      else if (l.type === 'fill-extrusion') { gl.setPaintProperty(id, 'fill-extrusion-color', '#e7e5e4'); gl.setPaintProperty(id, 'fill-extrusion-opacity', .82); }
+    }
+    const firstLabel = layers.find(l => l.type === 'symbol')?.id, cyc = ['all', ['==', ['get', 'class'], 'path'], ['==', ['get', 'subclass'], 'cycleway']];
+    const w = k => ['interpolate', ['linear'], ['zoom'], 11, 1.2 * k, 15, 4 * k, 19, 9 * k];
+    gl.addLayer({ id: 'cyc-casing', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation', minzoom: 10, filter: cyc, layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#052e16', 'line-width': w(1.5), 'line-opacity': .85 } }, firstLabel);
+    gl.addLayer({ id: 'cyc', type: 'line', source: 'openmaptiles', 'source-layer': 'transportation', minzoom: 10, filter: cyc, layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#22c55e', 'line-width': w(.8) } }, firstLabel);
+  };
+  gl.isStyleLoaded() ? run() : gl.once('style.load', run);
+}
+const hybridGL = () => {
+  const lyr = L.maplibreGL({ style: 'https://tiles.openfreemap.org/styles/liberty', pane: 'tilePane', attribution: '© OpenStreetMap · OpenFreeMap · Imagery © Esri · Orthophotos © IGN' });
+  lyr.on('add', () => hybridize(lyr.getMaplibreMap())); return lyr;
+};
 const base = {};
 if (hasGL) {
+  base['Satellite + rues + pistes'] = hybridGL();
   base['Moderne (vectorielle)'] = vec('liberty');
   base['Clair épuré'] = vec('positron');
   base['Sombre (vectorielle)'] = vec('dark');
 }
 base['Vélo (CyclOSM)'] = L.tileLayer('https://{s}.tile-cyclosm.org/cyclosm/{z}/{x}/{y}.png', { subdomains: 'abc', maxZoom: 20, attribution: '© OpenStreetMap · CyclOSM' });
 base['Relief (courbes de niveau)'] = L.tileLayer('https://tile.opentopomap.org/{z}/{x}/{y}.png', { maxZoom: 17, attribution: '© OpenStreetMap · OpenTopoMap (CC-BY-SA)' });
-base['Satellite'] = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: 'Imagery © Esri' });
+base['Satellite'] = L.layerGroup([L.tileLayer(ESRI_SAT, { maxZoom: 19, attribution: 'Imagery © Esri' }),
+  L.tileLayer(IGN_ORTHO, { maxZoom: 19, bounds: L.latLngBounds([FR_BOUNDS[1], FR_BOUNDS[0]], [FR_BOUNDS[3], FR_BOUNDS[2]]), attribution: 'Orthophotos © IGN' })]);
 base['OpenStreetMap'] = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' });
 base['Sombre (classique)'] = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, className: 'dark-tiles', attribution: '© OpenStreetMap' });
 const overlays = {
@@ -1549,6 +1606,62 @@ $('#sendVI').onclick = async () => {              // parcours -> VeloIndoor (≤
   toast('Envoi à VeloIndoor… (parcours aussi copié : « Importer depuis Vento »)', 6000);
 };
 $('#sendShare').onclick = shareGpx;
+/* ---------- Vue 3D : relief (AWS Terrain Tiles), bâtiments en volume (OpenFreeMap), parcours coloré par le vent, survol ---------- */
+let gl3 = null, fly = null, v3mode = store.get('vento.v3mode', 'sat');
+const DEM = { type: 'raster-dem', tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], tileSize: 256, maxzoom: 15, encoding: 'terrarium', attribution: 'Relief © Mapzen / AWS Terrain Tiles' };
+function routeFC3D(rt) {
+  const P = rt.rs.pts, segs = state.ana?.segs, line = (a, b, c) => ({ type: 'Feature', properties: { c }, geometry: { type: 'LineString', coordinates: [[a[1], a[0]], [b[1], b[0]]] } });
+  return { type: 'FeatureCollection', features: segs ? segs.map(s => line(P[s.i], P[s.i + 1], CLS[s.cls].col)) : P.slice(1).map((p, i) => line(P[i], p, '#22d3ee')) };
+}
+function setup3D() {
+  const rt = state.route; if (!gl3 || !rt) return;
+  if (v3mode === 'sat') hybridize(gl3, { buildings: true });
+  const run = () => {
+    if (!gl3.getSource('dem')) gl3.addSource('dem', DEM);
+    gl3.setTerrain({ source: 'dem', exaggeration: +$('#v3ex').value });
+    const ls = gl3.getStyle().layers, i = ls.findIndex(l => l.id === 'sat'), before = i >= 0 ? ls[i + 1]?.id : 'building';
+    if (!gl3.getLayer('hs')) gl3.addLayer({ id: 'hs', type: 'hillshade', source: 'dem', paint: { 'hillshade-exaggeration': .3, 'hillshade-shadow-color': '#000000' } }, before);
+    if (!gl3.getSource('rt')) {
+      gl3.addSource('rt', { type: 'geojson', data: routeFC3D(rt) });
+      gl3.addLayer({ id: 'rt-casing', type: 'line', source: 'rt', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 5, 16, 11], 'line-opacity': .95 } });
+      gl3.addLayer({ id: 'rt-line', type: 'line', source: 'rt', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': ['get', 'c'], 'line-width': ['interpolate', ['linear'], ['zoom'], 10, 3, 16, 7] } });
+    }
+  };
+  gl3.isStyleLoaded() ? run() : gl3.once('style.load', run);
+}
+function stopFly() { if (fly) { cancelAnimationFrame(fly.raf); fly = null; } $('#v3fly').textContent = '▶ Survol'; }
+function flyAlong() {
+  const rt = state.route; if (!gl3 || !rt) return;
+  if (fly) return stopFly();
+  const P = rt.rs.pts, step = rt.rs.step, at = d => { const x = clamp(d / step, 0, P.length - 1), i = Math.min(P.length - 2, Math.floor(x)), f = x - i; return [P[i][0] + (P[i + 1][0] - P[i][0]) * f, P[i][1] + (P[i + 1][1] - P[i][1]) * f]; };
+  const dur = clamp(rt.total / 1000 * 3000, 20000, 90000), t0 = performance.now(); let brg = null;
+  $('#v3fly').textContent = '⏸ Arrêter'; fly = { raf: 0 };
+  const frame = now => {
+    if (!fly) return; const f = clamp((now - t0) / dur, 0, 1), d = f * rt.total, p = at(d), q = at(Math.min(rt.total, d + 300)), tgt = bearing(p, q);
+    brg = brg == null ? tgt : brg + ((tgt - brg + 540) % 360 - 180) * .06;
+    gl3.jumpTo({ center: [p[1], p[0]], bearing: brg, pitch: 68, zoom: 15.4 });
+    if (f < 1) fly.raf = requestAnimationFrame(frame); else stopFly();
+  };
+  fly.raf = requestAnimationFrame(frame);
+}
+function open3D() {
+  const rt = state.route; if (!rt) return toast('Trace d\'abord un itinéraire.');
+  if (typeof maplibregl === 'undefined' || !hasGL) return toast('La vue 3D demande WebGL (non disponible ici).');
+  $('#v3d').hidden = false; $('#v3sat').classList.toggle('on', v3mode === 'sat'); $('#v3plan').classList.toggle('on', v3mode !== 'sat');
+  const b = new maplibregl.LngLatBounds(); rt.rs.pts.forEach(p => b.extend([p[1], p[0]]));
+  gl3 = new maplibregl.Map({ container: 'v3map', style: 'https://tiles.openfreemap.org/styles/liberty', bounds: b, fitBoundsOptions: { padding: 70, pitch: 60, bearing: rt.rs.pts.length > 1 ? bearing(rt.rs.pts[0], rt.rs.pts[rt.rs.pts.length - 1]) : 0 }, maxPitch: 85, attributionControl: { compact: true } });
+  gl3.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+  new maplibregl.Marker({ color: '#22c55e' }).setLngLat([rt.rs.pts[0][1], rt.rs.pts[0][0]]).addTo(gl3);
+  new maplibregl.Marker({ color: '#ef4444' }).setLngLat([rt.rs.pts[rt.rs.pts.length - 1][1], rt.rs.pts[rt.rs.pts.length - 1][0]]).addTo(gl3);
+  gl3.on('style.load', setup3D);
+}
+function close3D() { stopFly(); if (gl3) { gl3.remove(); gl3 = null; } $('#v3d').hidden = true; }
+function set3DMode(m) { v3mode = m; store.set('vento.v3mode', m); $('#v3sat').classList.toggle('on', m === 'sat'); $('#v3plan').classList.toggle('on', m !== 'sat'); if (gl3) { stopFly(); gl3.setStyle('https://tiles.openfreemap.org/styles/liberty'); } }
+$('#btn3d').onclick = open3D; $('#v3close').onclick = close3D; $('#v3fly').onclick = flyAlong;
+$('#v3sat').onclick = () => set3DMode('sat'); $('#v3plan').onclick = () => set3DMode('plan');
+$('#v3ex').oninput = e => { if (gl3 && gl3.getSource('dem')) gl3.setTerrain({ source: 'dem', exaggeration: +e.target.value }); };
+addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#v3d').hidden) close3D(); });
+
 /* ---------- Boucle intelligente : forme du jour (training.html) + vent + dénivelé ---------- */
 const destPt = (p, brg, km) => { const R = 6371, d = km / R, b = rad(brg), la = rad(p.lat), lo = rad(p.lng), la2 = Math.asin(Math.sin(la) * Math.cos(d) + Math.cos(la) * Math.sin(d) * Math.cos(b)); return { lat: deg(la2), lng: deg(lo + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(la), Math.cos(d) - Math.sin(la) * Math.sin(la2))) }; };
 function formInfo() {
