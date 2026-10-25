@@ -213,6 +213,14 @@ details.more .search{margin-top:8px}
 .sheet .steps li{margin:4px 0}
 @media (max-width:860px){.modal{align-items:flex-end;padding:0}.sheet{border-radius:18px 18px 0 0;width:100%}}
 
+/* ---------- flèches de vent ---------- */
+.windctl{display:flex;flex-direction:column;align-items:flex-end;gap:6px;margin-top:6px}
+.windctl .btn{width:44px;height:44px;font-size:21px;padding:0;background:rgba(16,21,28,.95)}
+.windctl .btn.on{background:rgba(34,211,238,.2);border-color:var(--c1)}
+#windInfo{background:rgba(10,14,19,.92);border:1px solid var(--line);border-radius:10px;padding:5px 9px;font:600 12px var(--mono);color:#e6ebf2;white-space:nowrap}
+#windInfo[hidden]{display:none}
+.wind-fx{position:absolute;left:0;top:0;pointer-events:none}
+
 /* ---------- côtes & profil ---------- */
 #climbs{margin-top:12px;display:flex;flex-direction:column;gap:4px}
 .climbhead{font-size:12px;color:var(--c7);margin-bottom:2px;font-weight:600}
@@ -912,7 +920,7 @@ function elevationStats(rt) {
 /* =====================================================================
    Rendu
    ===================================================================== */
-function renderAll() { renderRoute(); renderStats(); renderWind(); renderHours(); renderClimbs(); renderSafety(); renderCommute(); syncDA(); rebuildPOI(); drawProfile(); syncRider(); }
+function renderAll() { renderRoute(); renderStats(); renderWind(); renderHours(); renderClimbs(); renderSafety(); renderCommute(); syncDA(); rebuildPOI(); drawProfile(); syncRider(); if (typeof WindFx !== 'undefined') WindFx.hourChanged(); }
 
 function syncRider() {                                     // reflète le profil Strava (training.html) dans le panneau « Cycliste »
   state.rider = Rider.load(); const r = state.rider, has = !!r?.ftp, on = !!activeProfile();
@@ -1667,6 +1675,131 @@ function renderCommute() {
 }
 
 /* =====================================================================
+   Flèches de vent animées (sens = direction du vent, vitesse de défilement et couleur = force du vent)
+   Champ de vent : nœuds Open-Meteo sur la zone visible (à l'heure de départ choisie), interpolés ; particules en forme de flèche.
+   ===================================================================== */
+const WindFx = (() => {
+  const cv = L.DomUtil.create('canvas', 'wind-fx'), ctx = cv.getContext('2d');
+  const cache = new Map();                       // "lat,lng|heure" -> { s: km/h, d: ° (d'où vient le vent) }
+  let on = false, raf = 0, parts = [], lattice = null, hourKey = '', timer = 0, tok = 0, avg = null, fallback = false;
+  const mobile = () => matchMedia('(max-width: 860px)').matches;
+  const COLORS = [[10, '#bae6fd'], [20, '#22d3ee'], [30, '#a3e635'], [40, '#fbbf24'], [1e9, '#f43f5e']];
+  const colorOf = s => COLORS.find(c => s < c[0])[1];
+  const hourOf = ms => new Date(ms).toISOString().slice(0, 13) + ':00';
+
+  function place() {
+    const s = map.getSize(); if (cv.width !== s.x || cv.height !== s.y) { cv.width = s.x; cv.height = s.y; }
+    L.DomUtil.setPosition(cv, map.containerPointToLayerPoint([0, 0]));
+  }
+  /* ---- champ de vent ---- */
+  const CK = 'vento.windcache';                   // cache conservé 90 min (économise les appels Open-Meteo : chaque nœud compte comme un appel)
+  try { const o = JSON.parse(localStorage.getItem(CK) || '{}'), now = Date.now(); for (const [k, v] of Object.entries(o)) if (now - v[2] < 90 * 60e3) cache.set(k, { s: v[0], d: v[1], t: v[2] }); } catch {}
+  const saveCache = () => { try { const o = {}; let n = 0; for (const [k, v] of cache) { if (n++ > 400) break; o[k] = [v.s, v.d, v.t || Date.now()]; } localStorage.setItem(CK, JSON.stringify(o)); } catch {} };
+  function nodesForView() {                       // grille géographique régulière couvrant la vue (≤ 16 nœuds)
+    const b = map.getBounds().pad(.1), n = b.getNorth(), s = b.getSouth(), w = b.getWest(), e = b.getEast();
+    let step = .25; for (const st of [.25, .5, 1, 2, 4, 8]) { step = st; if ((Math.floor((n - s) / st) + 2) * (Math.floor((e - w) / st) + 2) <= 16) break; }
+    const out = [];
+    for (let la = Math.floor(s / step) * step; la <= n + step; la += step) for (let lo = Math.floor(w / step) * step; lo <= e + step; lo += step)
+      out.push({ lat: +la.toFixed(3), lng: +lo.toFixed(3) });
+    return out;
+  }
+  async function fetchNodes(nodes, hour) {
+    const miss = nodes.filter(p => !cache.has(`${p.lat},${p.lng}|${hour}`));
+    for (let i = 0; i < miss.length; i += 40) {
+      const ch = miss.slice(i, i + 40), q = `latitude=${ch.map(p => p.lat).join(',')}&longitude=${ch.map(p => p.lng).join(',')}&hourly=wind_speed_10m,wind_direction_10m&wind_speed_unit=kmh&timezone=GMT`;
+      let j, cur = false;
+      try { j = await fetchJSON(`https://api.open-meteo.com/v1/forecast?${q}&start_hour=${hour}&end_hour=${hour}`, {}, 15000); }
+      catch { j = await fetchJSON(`https://api.open-meteo.com/v1/forecast?${q.replace('hourly=', 'current=')}`, {}, 15000); cur = true; }   // hors prévisions : vent actuel
+      fallback = cur;
+      (Array.isArray(j) ? j : [j]).forEach((o, k) => {
+        const s = cur ? o.current?.wind_speed_10m : o.hourly?.wind_speed_10m?.[0], d = cur ? o.current?.wind_direction_10m : o.hourly?.wind_direction_10m?.[0];
+        if (s != null && d != null) cache.set(`${ch[k].lat},${ch[k].lng}|${hour}`, { s, d, t: Date.now() });
+      });
+    }
+    if (miss.length) saveCache();
+  }
+  function windAtLL(lat, lng, nodes, hour) {      // interpolation (pondération par l'inverse de la distance²) des nœuds disponibles
+    let sx = 0, sy = 0, sw = 0;
+    for (const p of nodes) {
+      const v = cache.get(`${p.lat},${p.lng}|${hour}`); if (!v) continue;
+      const dl = p.lat - lat, dn = (p.lng - lng) * Math.cos(rad(lat)), w = 1 / (dl * dl + dn * dn + 1e-6);
+      sx += w * -v.s * Math.sin(rad(v.d)); sy += w * -v.s * Math.cos(rad(v.d)); sw += w;       // composantes (vers où souffle le vent : x = est, y = nord)
+    }
+    return sw ? { x: sx / sw, y: sy / sw } : null;
+  }
+  function buildLattice(nodes, hour) {            // échantillonne le champ sur un quadrillage d'écran (24×16) pour animer vite
+    const sz = map.getSize(), cols = 24, rows = 16, f = new Float32Array(cols * rows * 2); let any = false, tx = 0, ty = 0;
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const ll = map.containerPointToLatLng([c / (cols - 1) * sz.x, r / (rows - 1) * sz.y]), v = windAtLL(ll.lat, ll.lng, nodes, hour);
+      if (v) { any = true; tx += v.x; ty += v.y; } const i = (r * cols + c) * 2; f[i] = v ? v.x : 0; f[i + 1] = v ? v.y : 0;
+    }
+    lattice = any ? { f, cols, rows, sz } : null;
+    avg = any ? { s: Math.hypot(tx, ty) / (cols * rows), d: (deg(Math.atan2(-tx, -ty)) + 360) % 360 } : null;   // d = direction d'où vient le vent
+  }
+  function sample(x, y) {                         // bilinéaire sur le quadrillage d'écran -> { vx (px, vers la droite), vy (vers le bas), s }
+    const L_ = lattice, gx = clamp(x / L_.sz.x, 0, 1) * (L_.cols - 1), gy = clamp(y / L_.sz.y, 0, 1) * (L_.rows - 1);
+    const c0 = Math.floor(gx), r0 = Math.floor(gy), c1 = Math.min(L_.cols - 1, c0 + 1), r1 = Math.min(L_.rows - 1, r0 + 1), fx = gx - c0, fy = gy - r0;
+    const g = (r, c, k) => L_.f[(r * L_.cols + c) * 2 + k];
+    const mix = k => (g(r0, c0, k) * (1 - fx) + g(r0, c1, k) * fx) * (1 - fy) + (g(r1, c0, k) * (1 - fx) + g(r1, c1, k) * fx) * fy;
+    const ex = mix(0), ny = mix(1); return { vx: ex, vy: -ny, s: Math.hypot(ex, ny) };   // écran : y vers le bas = −nord
+  }
+  async function refresh(force) {
+    if (!on) return; clearTimeout(timer);
+    timer = setTimeout(async () => {
+      const my = ++tok, hour = hourOf(state.startMs), nodes = nodesForView(); hourKey = hour;
+      try { await fetchNodes(nodes, hour); } catch (e) { console.warn('vent', e); setInfo('⚠ vent indisponible'); return; }
+      if (my !== tok) return; buildLattice(nodes, hour); setInfo();
+    }, force ? 0 : 450);
+  }
+  function setInfo(msg) {
+    const el = document.getElementById('windInfo'); if (!el) return;
+    el.textContent = msg || (avg ? `Vent du ${cardinal(avg.d)} · ${Math.round(avg.s)} km/h${fallback ? ' (actuel)' : ' · ' + new Date(state.startMs).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : 'Chargement du vent…');
+  }
+  /* ---- particules (flèches) ---- */
+  function spawn(p, fresh) {
+    p.x = Math.random() * cv.width; p.y = Math.random() * cv.height; p.life = 70 + Math.random() * 90; p.age = fresh ? Math.random() * p.life : 0; return p;
+  }
+  function frame() { raf = requestAnimationFrame(frame); draw(); }
+  function draw(force) {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    if (!lattice || (document.hidden && !force) || cv.style.visibility === 'hidden') return;
+    const target = Math.min(mobile() ? 320 : 650, Math.round(cv.width * cv.height / (mobile() ? 1700 : 2300)));
+    while (parts.length < target) parts.push(spawn({}, true));
+    if (parts.length > target) parts.length = target;
+    for (const p of parts) {
+      const v = sample(p.x, p.y), k = v.s > .5 ? 1 / v.s : 0, step = clamp(v.s * .055, .15, 5);       // px par image : plus de vent = plus vite
+      p.x += v.vx * k * step; p.y += v.vy * k * step; p.age++;
+      if (p.age > p.life || p.x < -10 || p.y < -10 || p.x > cv.width + 10 || p.y > cv.height + 10) { spawn(p, false); continue; }
+      const a = Math.min(1, p.age / 14, (p.life - p.age) / 20) * .95, len = clamp(5 + v.s * .22, 6, 15), ang = Math.atan2(v.vy, v.vx);
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(ang); ctx.globalAlpha = a; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.beginPath(); ctx.moveTo(-len / 2, 0); ctx.lineTo(len / 2, 0); ctx.moveTo(len / 2 - 4, -3); ctx.lineTo(len / 2, 0); ctx.lineTo(len / 2 - 4, 3);
+      ctx.strokeStyle = 'rgba(5,10,18,.55)'; ctx.lineWidth = 3.4; ctx.stroke();                      // liseré sombre : lisible sur carte claire
+      ctx.strokeStyle = colorOf(v.s); ctx.lineWidth = 1.7; ctx.stroke(); ctx.restore();
+    }
+  }
+  function setOn(v) {
+    on = v; store.set('vento.windFx', v); cv.style.display = v ? '' : 'none';
+    document.getElementById('btnWind')?.classList.toggle('on', v); document.getElementById('windInfo').hidden = !v;
+    cancelAnimationFrame(raf); if (v) { place(); setInfo('Chargement du vent…'); raf = requestAnimationFrame(frame); refresh(true); } else ctx.clearRect(0, 0, cv.width, cv.height);
+  }
+  function init() {
+    cv.style.pointerEvents = 'none'; const pane = map.getPane('overlayPane'); pane.insertBefore(cv, pane.firstChild);
+    map.on('move', place); map.on('resize', () => { place(); lattice && refresh(true); });
+    map.on('zoomstart', () => { cv.style.visibility = 'hidden'; }); map.on('zoomend', () => { cv.style.visibility = ''; place(); parts = []; refresh(); });
+    map.on('moveend', () => { place(); refresh(); });
+    const Ctl = L.Control.extend({ onAdd() {
+      const d = L.DomUtil.create('div', 'windctl');
+      d.innerHTML = '<button class="btn" id="btnWind" title="Flèches animées : sens, vitesse et force du vent">💨</button><div id="windInfo" hidden></div>';
+      L.DomEvent.disableClickPropagation(d); return d;
+    } });
+    new Ctl({ position: 'topright' }).addTo(map);
+    document.getElementById('btnWind').onclick = () => setOn(!on);
+    setOn(store.get('vento.windFx', !matchMedia('(prefers-reduced-motion: reduce)').matches));
+  }
+  return { init, refresh, hourChanged() { if (on && hourKey !== hourOf(state.startMs)) refresh(true); }, setOn, get on() { return on; }, _dbg: () => ({ parts, lattice, avg, cache, draw }) };
+})();
+
+/* =====================================================================
    Interactions
    ===================================================================== */
 /* Retour / Rétablir : chaque action (point ajouté, déplacé, supprimé, boucle, inversion, effacement…) est empilée,
@@ -1819,6 +1952,7 @@ $('#mUndo').onclick = undo; $('#mRedo').onclick = redo; $('#mLoop').onclick = ()
 $('#mSafe').onclick = () => setSafeMode(!state.safeMode); $('#mGpx').onclick = exportGPX;
 $('#tAller').value = state.commute.aller; $('#tRetour').value = state.commute.retour; $('#commuteSafe').checked = state.commute.safe !== false;
 if (store.get('vento.safeMode', false)) setSafeMode(true);
+WindFx.init();
 {
   const cur = store.get('vento.current', null);
   if (cur?.wps?.length) {

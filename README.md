@@ -15,6 +15,7 @@ Application web (PWA) pour préparer ses sorties à vélo : **vent**, **pistes c
 - **Itinéraire le plus sûr** (BRouter, profil « très peu de trafic ») avec **score de sécurité** : part de piste cyclable, bande cyclable, rue calme, route à fort trafic.
 - **Cartes** : vectorielles modernes (OpenFreeMap : moderne, clair épuré, sombre), CyclOSM, relief avec courbes de niveau, satellite. Choix via le bouton des couches en haut à droite de la carte.
 - **Carte des pistes cyclables** : fond atténué + aménagements cyclables OpenStreetMap en couleur.
+- **Flèches de vent animées** sur la carte (bouton 💨) : le sens des flèches suit le vent, elles défilent d'autant plus vite et changent de couleur (bleu → vert → jaune → rouge) que le vent est fort ; le vent affiché correspond à l'heure de départ choisie.
 - **Vent** par tronçon à l'heure de passage, meilleur créneau de départ, comparaison du sens de parcours.
 - **Vélo-taf** : enregistre maison et travail, compare chaque jour le vent et la durée aller / retour.
 - **Temps estimé** à partir de ta puissance (profil Strava), côtes détectées, météo.
