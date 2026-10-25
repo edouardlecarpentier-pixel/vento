@@ -838,6 +838,16 @@ async function routeBRouter(pts, profile) {
   const ele = c.every(p => Number.isFinite(p[2])) ? c.map(p => p[2]) : null;                    // BRouter fournit l'altitude (SRTM) de chaque point : aucun appel supplémentaire
   return { coords: c.map(p => [p[1], p[0]]), ele, msgs: j.features[0].properties?.messages || null };   // msgs = nature de chaque tronçon (OSM)
 }
+function eleFromRef(rt) {                                    // altitude d'un GPX importé : point du fichier le plus proche de chaque point du profil (null si le tracé s'en écarte trop)
+  const ref = state.eleRef; if (!ref || ref.length < 2) return null;
+  const out = []; let ok = 0;
+  for (const p of rt.rs.pts) {
+    const k = Math.cos(rad(p[0])); let best = Infinity, e = 0;
+    for (const r of ref) { const dy = r[0] - p[0], dx = (r[1] - p[1]) * k, d = dy * dy + dx * dx; if (d < best) { best = d; e = r[2]; } }
+    if (Math.sqrt(best) * 111320 < 150) ok++; out.push(e);
+  }
+  return ok >= out.length * .9 ? out : null;
+}
 function eleFromRaw(rt) {                                    // altitude du tracé BRouter rééchantillonnée comme le profil
   const e = rt.rawEle, cum = rt.cum, out = []; let j = 0;
   for (const d of rt.rs.cum) {
@@ -1060,11 +1070,12 @@ async function recompute() {
   renderAll();                                           // tracé provisoire + distance
   setBusy('Altitude & vent…');
   rt.rawEle = res.ele && res.ele.length === rt.raw.length ? res.ele : null;
-  const [eleR, windR] = await Promise.allSettled([rt.rawEle ? Promise.resolve(eleFromRaw(rt)) : fetchElevation(rt.rs.pts), fetchWind(rt)]);
+  const refEle = rt.rawEle ? null : eleFromRef(rt);
+  const [eleR, windR] = await Promise.allSettled([rt.rawEle ? Promise.resolve(eleFromRaw(rt)) : refEle ? Promise.resolve(refEle) : fetchElevation(rt.rs.pts), fetchWind(rt)]);
   if (tok !== state.tok) return;
   let msg = '', err = false;
   if (eleR.status === 'fulfilled') { rt.rs.ele = smooth(eleR.value.map(v => v ?? 0), 2); rt.rs.hasEle = true; }
-  else { console.warn(eleR.reason); msg = 'altitude indisponible'; err = true; }
+  else { console.warn(eleR.reason); msg = 'altitude indisponible' + (state.set.routing === 'line' ? ' — essaie « Recaler cette trace sur les routes »' : ''); err = true; }
   if (windR.status === 'fulfilled') state.wind = windR.value;
   else { console.warn(windR.reason); state.wind = null; msg += (msg ? ' · ' : '') + 'prévisions de vent indisponibles'; err = true; }
   setBusy(msg, err);
@@ -1722,8 +1733,14 @@ function importGPX(text) {
   if (doc.querySelector('parsererror')) return toast('Fichier GPX illisible');
   let nodes = [...doc.getElementsByTagName('trkpt')];
   if (!nodes.length) nodes = [...doc.getElementsByTagName('rtept')];
-  const pts = nodes.map(n => [parseFloat(n.getAttribute('lat')), parseFloat(n.getAttribute('lon'))]).filter(p => isFinite(p[0]) && isFinite(p[1]));
+  const full = nodes.map(n => [parseFloat(n.getAttribute('lat')), parseFloat(n.getAttribute('lon')), parseFloat(n.getElementsByTagName('ele')[0]?.textContent)]).filter(p => isFinite(p[0]) && isFinite(p[1]));
+  const pts = full.map(p => [p[0], p[1]]);
   if (pts.length < 2) return toast('Aucune trace trouvée dans ce GPX');
+  state.eleRef = null;                                                                           // altitude du fichier : gardée pour le profil (sans appel à un service en ligne)
+  if (full.filter(p => isFinite(p[2])).length >= full.length * .8) {
+    const k = Math.max(1, Math.ceil(full.length / 800)); let last = full.find(p => isFinite(p[2]))[2];
+    state.eleRef = full.filter((_, i) => i % k === 0 || i === full.length - 1).map(p => { if (isFinite(p[2])) last = p[2]; return [+p[0].toFixed(5), +p[1].toFixed(5), Math.round(last * 10) / 10]; });
+  }
   let tol = 6, s = simplifyDP(pts, tol); while (s.length > 250 && tol < 400) { tol *= 1.4; s = simplifyDP(pts, tol); }
   pushHistory(); state.loop = false; state.hasEnd = false; state.labels = {};
   const typ = (doc.querySelector('trk > type')?.textContent || '').toLowerCase();                 // course / marche / vélo reconnus
@@ -2237,7 +2254,7 @@ function syncButtons() {
 }
 function persist() {
   syncButtons(); store.set('vento.settings', state.set);
-  store.set('vento.current', { wps: state.wps, loop: state.loop, name: state.name, hasEnd: state.hasEnd, labels: state.labels, upois: state.userPois });
+  store.set('vento.current', { wps: state.wps, loop: state.loop, name: state.name, hasEnd: state.hasEnd, labels: state.labels, upois: state.userPois, eleRef: state.eleRef || null });
 }
 
 map.on('click', e => {
@@ -2255,7 +2272,7 @@ $('#btnRedo').onclick = redo;
 $('#btnSwap').onclick = reverseRoute;
 $('#btnLoop').onclick = () => { pushHistory(); state.loop = !state.loop; scheduleRecompute(50); };
 $('#btnRev').onclick = reverseRoute;
-$('#btnClear').onclick = () => { pushHistory(); state.wps = []; state.loop = false; state.hasEnd = false; state.pendingEnd = null; state.labels = {}; scheduleRecompute(0); };
+$('#btnClear').onclick = () => { pushHistory(); state.wps = []; state.loop = false; state.hasEnd = false; state.pendingEnd = null; state.labels = {}; state.eleRef = null; scheduleRecompute(0); };
 $('#btnGpx').onclick = $('#btnGpx2').onclick = exportGPX;
 $('#btnSave').onclick = saveRoute;
 $('#btnImport').onclick = () => $('#file').click();
@@ -2415,7 +2432,7 @@ WindFx.init();
 {
   const cur = store.get('vento.current', null);
   if (cur?.wps?.length) {
-    state.wps = cur.wps; state.loop = !!cur.loop; state.name = cur.name || ''; $('#name').value = state.name; state.hasEnd = !!cur.hasEnd; state.labels = cur.labels || {}; state.userPois = cur.upois || [];
+    state.wps = cur.wps; state.loop = !!cur.loop; state.name = cur.name || ''; $('#name').value = state.name; state.hasEnd = !!cur.hasEnd; state.labels = cur.labels || {}; state.userPois = cur.upois || []; state.eleRef = cur.eleRef || null;
     map.fitBounds(L.latLngBounds(cur.wps.map(w => [w.lat, w.lng])), { padding: [70, 70], maxZoom: 13 });
   }
 }
