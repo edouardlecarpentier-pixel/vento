@@ -64,3 +64,4 @@ Les estimations (durée, vent, FTP, conseils) sont des repères : reste prudent 
 - **Meilleur créneau** : pénalise pluie, froid/chaleur et rafales, pas seulement le vent.
 - **Secours** : MET Norway pour le vent, altitude fournie par BRouter (aucun quota), puis Open-Elevation si besoin.
 - **Sauvegarde** : fichier JSON complet (sans identifiants Strava) + rappel ; bilans et FTP aussi synchronisés par le Gist chiffré.
+- **Sections dépliables** (ordinateur) : un clic sur le titre d'une carte l'ouvre ou la ferme (Vélo-taf, Cycliste, Points d'intérêt, Export, Synchro… fermés par défaut) ; ton choix est mémorisé. Page Entraînement : séance du jour en haut, cartes secondaires repliées. Sur téléphone : onglets en bas, et **balayage latéral** sur le panneau pour passer à l'onglet suivant ou précédent.

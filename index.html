@@ -615,6 +615,7 @@ input:focus,select:focus{border-color:var(--a,var(--acc))}
 <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.0.22/leaflet-maplibre-gl.js"></script>
 <script src="rider.js"></script>
 <script src="sync.js"></script>
+<script src="fold.js"></script>
 <script>
 'use strict';
 /* =====================================================================
@@ -2211,6 +2212,9 @@ renderSaved();
 const cards = [...document.querySelectorAll('#panel .card')];
 cards.forEach((c, i) => { c.classList.add(['c1', 'c5', 'c2', 'c6', 'c4', 'c7', 'c7', 'c3', 'c3', 'c1', 'c6'][i] || 'c1'); c.dataset.tab = ['trajet', 'taf', 'parcours', 'vent', 'vent', 'moi', 'moi', 'poi', 'poi', 'moi', 'moi'][i] || 'moi'; });
 
+/* ---------- ordinateur : cartes dépliables (clic sur le titre ; l'état est mémorisé). Sur téléphone, ce sont les onglets qui jouent ce rôle ---------- */
+VFold.init(cards, { key: 'vento.fold', minWidth: 861, closed: ['Vélo-taf', 'Cycliste', 'Mes points', 'Points d\'intérêt', 'Export', 'Synchronisation'] });
+
 /* ---------- téléphone : onglets, panneau coulissant, barre d'actions ---------- */
 const mq = matchMedia('(max-width: 860px)'), panel = $('#panel');
 function setSheet(s) { panel.dataset.sheet = s; panel.style.removeProperty('--sheet'); store.set('vento.sheet', s); }
@@ -2220,6 +2224,17 @@ function setTab(t, open = true) {
   panel.scrollTop = 0; store.set('vento.tab', t); setTimeout(drawProfile, 260);
 }
 document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => setTab(b.dataset.tab));
+{                                                    // balayage horizontal sur le panneau = onglet suivant / précédent (téléphone)
+  let sw = null;
+  const scrollsX = el => { for (; el && el !== panel; el = el.parentElement) { const o = getComputedStyle(el).overflowX; if ((o === 'auto' || o === 'scroll') && el.scrollWidth > el.clientWidth + 4) return true; if (/^(INPUT|TEXTAREA|SELECT|CANVAS)$/.test(el.tagName)) return true; } return false; };
+  panel.addEventListener('touchstart', e => { sw = mq.matches && e.touches.length === 1 && !e.target.closest('#sheetHandle') && !scrollsX(e.target) ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null; }, { passive: true });
+  panel.addEventListener('touchend', e => {
+    if (!sw) return; const t = e.changedTouches[0], dx = t.clientX - sw.x, dy = t.clientY - sw.y; sw = null;
+    if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * .5) return;
+    const tabs = [...document.querySelectorAll('#tabs button')].map(b => b.dataset.tab), i = tabs.indexOf(panel.dataset.active), j = clamp(i + (dx < 0 ? 1 : -1), 0, tabs.length - 1);
+    if (j !== i) { setTab(tabs[j]); document.querySelector(`#tabs button[data-tab="${tabs[j]}"]`)?.scrollIntoView({ block: 'nearest', inline: 'center' }); }
+  }, { passive: true });
+}
 {
   const handle = $('#sheetHandle'); let drag = null;
   handle.addEventListener('pointerdown', e => { handle.setPointerCapture(e.pointerId); drag = { y: e.clientY, h: panel.getBoundingClientRect().height, moved: false }; panel.classList.add('dragging'); });

@@ -278,6 +278,7 @@ h3.ch small{color:var(--mut);font-weight:400}
 
 <script src="rider.js"></script>
 <script src="sync.js"></script>
+<script src="fold.js"></script>
 <script>
 'use strict';
 const $ = (s, r = document) => r.querySelector(s);
@@ -1156,6 +1157,9 @@ $('#bkFile').onchange = async e => {
   } catch (err) { setStatus('Restauration impossible : ' + err.message, true); }
   e.target.value = '';
 };
+/* Cartes dépliables : la séance du jour passe en haut, les cartes secondaires sont repliées (clic sur le titre pour ouvrir ; état mémorisé) */
+$('#cardConn').after($('#cardToday'), $('#cardBilan')); $('#cardCurve').after($('#cardProg'));
+VFold.init([...document.querySelectorAll('.card')], { key: 'vento.fold.train', closed: [...(S.refresh ? ['Connexion Strava'] : []), 'Charge hebdomadaire', 'Temps par zone', 'Tes côtes', 'Analyse'] });
 $('#viAuto').onchange = e => { store.set(AUTO_STRAVA, e.target.checked); };
 $('#btnViSend').onclick = () => flushPending(true);
 $('#btnViAuth').onclick = connect;
