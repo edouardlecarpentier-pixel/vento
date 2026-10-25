@@ -11,6 +11,7 @@
   --c1:#22d3ee;--c2:#a78bfa;--c3:#f472b6;--c4:#fb923c;--c5:#4ade80;--c6:#60a5fa;--c7:#fbbf24;--bad:#ef4444;--warn:#f59e0b;
   --mono:ui-monospace,SFMono-Regular,"Cascadia Mono",Consolas,Menlo,monospace;--r:14px}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 html,body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
 body{min-height:100%;background:radial-gradient(700px 360px at 0 0,rgba(34,211,238,.14),transparent 70%),radial-gradient(600px 400px at 100% 20%,rgba(167,139,250,.13),transparent 70%),radial-gradient(500px 360px at 20% 100%,rgba(244,114,182,.10),transparent 70%),var(--bg);background-attachment:fixed}
 a{color:var(--c1)}
@@ -191,7 +192,11 @@ const DAY = 864e5, WIN = [5, 30, 60, 300, 600, 1200, 1800, 3600];
 const fmtDur = s => { const m = Math.round(s / 60), h = Math.floor(m / 60); return h ? `${h} h ${String(m % 60).padStart(2, '0')}` : `${m} min`; };
 const fmtWin = w => w < 60 ? w + ' s' : w < 3600 ? w / 60 + ' min' : '1 h';
 
-let S = store.get('vento.strava', {});       // identifiants + jetons (restent dans ce navigateur)
+// Jetons de connexion : propres à chaque appareil. Identifiants de TON application Strava (Client ID / Secret) :
+// synchronisés (chiffrés) entre tes appareils pour ne les saisir qu'une fois.
+let S = { ...store.get('vento.strava', {}), ...store.get('vento.stravaApp', {}) };
+function saveS() { const { cid, secret, ...tokens } = S; store.set('vento.strava', tokens); if (cid && secret) store.set('vento.stravaApp', { cid, secret }); }
+const LAST_SYNC = 'vento.stravaLastSync';
 let rides = store.get('vento.rides', []);     // résumés + détails calculés
 let ov = store.get('vento.profile', {});      // valeurs saisies à la main
 let isDemo = store.get('vento.demo', false);
@@ -209,12 +214,12 @@ function authUrl(cid) {
   return 'https://www.strava.com/oauth/authorize?' + q;
 }
 function connect() {
-  const cid = $('#cid').value.replace(/\s+/g, ''), sec = $('#csec').value.replace(/\s+/g, '');   // espaces/retours collés par erreur
+  const cid = ($('#cid').value || S.cid || '').replace(/\s+/g, ''), sec = ($('#csec').value || S.secret || '').replace(/\s+/g, '');   // espaces/retours collés par erreur
   if (!cid || !sec) return setStatus('Renseigne le Client ID et le Client Secret (voir le pas à pas ci-dessus).', true);
   if (!/^\d{4,9}$/.test(cid)) return setStatus('Le Client ID doit être un nombre (par ex. 123456), tel qu\'affiché sur strava.com/settings/api. Ne colle pas le Client Secret ni un jeton ici.', true);
   if (!/^[0-9a-f]{40}$/i.test(sec)) return setStatus('Le Client Secret doit faire 40 caractères (lettres a–f et chiffres). Copie-le en entier depuis strava.com/settings/api.', true);
   if (!/^https?:$/.test(location.protocol)) return setStatus('Ouvre cette page via une adresse http(s) (le site GitHub, ou http://localhost:8765/training.html avec serve.ps1) : Strava refuse les pages « file:// ».', true);
-  S = { ...S, cid, secret: sec }; store.set('vento.strava', S);
+  S = { ...S, cid, secret: sec }; saveS();
   location.href = authUrl(cid);
 }
 async function tokenRequest(body) {
@@ -222,7 +227,7 @@ async function tokenRequest(body) {
   if (!r.ok) throw new Error('Strava a refusé la connexion (' + r.status + ') — vérifie le Client ID / Secret et que le domaine de rappel Strava est bien « ' + (location.hostname || 'localhost') + ' ».');
   const j = await r.json();
   S = { ...S, access: j.access_token, refresh: j.refresh_token, exp: j.expires_at, athlete: { ...(S.athlete || {}), ...(j.athlete ? { id: j.athlete.id, firstname: j.athlete.firstname } : {}) } };
-  store.set('vento.strava', S);
+  saveS();
 }
 async function accessToken() {
   if (!S.refresh) throw new Error('Non connecté');
@@ -238,21 +243,28 @@ async function api(path) {
 }
 async function handleCallback() {
   const q = new URLSearchParams(location.search);
-  if (!q.has('code') && !q.has('error')) return;
+  if (!q.has('code') && !q.has('error')) return false;
   history.replaceState({}, '', location.pathname);
-  if (q.get('error')) return setStatus('Connexion refusée sur Strava.', true);
+  if (q.get('error')) { setStatus('Connexion refusée sur Strava.', true); return false; }
   if (!(q.get('scope') || '').includes('activity:read')) setStatus('Attention : l\'accès aux activités n\'a pas été autorisé (coche « Afficher les données de mes activités »).', true);
   try {
     setStatus('Connexion en cours…'); await tokenRequest({ grant_type: 'authorization_code', code: q.get('code') });
-    setStatus('Connecté à Strava ✓ — clique sur « Synchroniser mes sorties ».');
-  } catch (e) { setStatus(e.message, true); }
+    setStatus('Connecté à Strava ✓'); return true;
+  } catch (e) { setStatus(e.message, true); return false; }
+}
+/* Connexion permanente : le jeton de rafraîchissement reste sur l'appareil et se renouvelle seul ;
+   à l'ouverture de la page, les nouvelles sorties sont récupérées automatiquement (au plus toutes les 30 min). */
+async function autoSync() {
+  if (!S.refresh || isDemo) return;
+  if (Date.now() - (store.get(LAST_SYNC, 0)) < 30 * 60 * 1000) return;
+  await syncActivities(10);
 }
 
 const RIDE_TYPES = new Set(['Ride', 'GravelRide', 'MountainBikeRide', 'VirtualRide']);
-async function syncActivities() {
+async function syncActivities(batch = 25) {
   try {
     setBar(0); setStatus('Récupération de ton profil et de tes sorties…');
-    const ath = await api('/athlete'); S.athlete = { id: ath.id, firstname: ath.firstname, weight: ath.weight || null, ftp: ath.ftp || null }; store.set('vento.strava', S);
+    const ath = await api('/athlete'); S.athlete = { id: ath.id, firstname: ath.firstname, weight: ath.weight || null, ftp: ath.ftp || null }; saveS();
     const after = Math.floor((Date.now() - 400 * DAY) / 1000), list = [];
     for (let page = 1; page <= 4; page++) { const a = await api(`/athlete/activities?per_page=100&page=${page}&after=${after}`); list.push(...a); if (a.length < 100) break; }
     const old = new Map(rides.map(r => [r.id, r]));
@@ -263,7 +275,7 @@ async function syncActivities() {
     })).sort((x, y) => y.date - x.date);
     isDemo = false; store.set('vento.demo', false); persistRides();
     setStatus(`${rides.length} sorties à vélo trouvées. Analyse détaillée des plus récentes…`);
-    await detailBatch(25);
+    await detailBatch(batch); store.set(LAST_SYNC, Date.now());
   } catch (e) { setBar(null); setStatus(e.message, true); }
   refresh();
 }
@@ -643,10 +655,10 @@ function loadDemo() {
    Événements
    ===================================================================== */
 $('#btnConnect').onclick = connect;
-$('#btnSync').onclick = syncActivities;
+$('#btnSync').onclick = () => syncActivities(25);
 $('#btnMore').onclick = async () => { try { setBar(0); await detailBatch(25); } catch (e) { setBar(null); setStatus(e.message, true); } refresh(); };
 $('#btnDemo').onclick = () => { setStatus('Génération de la démo…'); setTimeout(loadDemo, 30); };
-$('#btnLogout').onclick = () => { S = {}; store.del('vento.strava'); rides = []; store.del('vento.rides'); Rider.clear(); setStatus('Déconnecté — données locales effacées.'); refresh(); };
+$('#btnLogout').onclick = () => { S = { cid: S.cid, secret: S.secret }; store.del('vento.strava'); store.del(LAST_SYNC); rides = []; store.del('vento.rides'); setStatus('Déconnecté de Strava (tes identifiants d\'application restent enregistrés : un clic suffit pour te reconnecter).'); refresh(); };
 $('#btnClearDemo').onclick = () => { rides = []; isDemo = false; store.del('vento.rides'); store.del('vento.demo'); Rider.clear(); setStatus('Démo effacée.'); refresh(); };
 [['ovFtp', 'ftp'], ['ovW', 'weight'], ['ovHr', 'hrmax']].forEach(([id, k]) => $('#' + id).onchange = e => { const v = parseFloat(e.target.value); if (v > 0) ov[k] = v; else delete ov[k]; store.set('vento.profile', ov); refresh(); });
 // redessine seulement les graphiques : le clavier du téléphone déclenche « resize » et ne doit pas réinitialiser les champs
@@ -656,7 +668,12 @@ $('.cbDomain').textContent = location.hostname || 'localhost';
 $('.siteUrl').textContent = location.origin.startsWith('http') ? location.origin : 'http://localhost:8765';
 $('.pageUrl').textContent = location.origin.startsWith('http') ? location.origin + location.pathname : 'http://localhost:8765/training.html';
 
-handleCallback().then(refresh);
+handleCallback().then(async fresh => {
+  refresh();
+  if (fresh) await syncActivities(25);                        // juste après la connexion : récupère tout de suite les sorties
+  else if (S.refresh) autoSync();                             // déjà connecté : mise à jour silencieuse
+  else if (S.cid && S.secret) setStatus('Identifiants Strava déjà enregistrés : clique simplement sur « Se connecter à Strava ».');
+});
 </script>
 </body>
 </html>

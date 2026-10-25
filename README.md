@@ -21,7 +21,7 @@ Application web (PWA) pour préparer ses sorties à vélo : **vent**, **pistes c
 - **Points d'intérêt** : eau, boulangeries, cafés, vélo, gares… (Overpass).
 - **Export / import GPX**, sauvegarde locale des parcours ; sur Android, fenêtre d'envoi vers Garmin Connect.
 - **Interface téléphone** : carte plein écran, panneau coulissant à onglets (Trajet, Parcours, Vent, Vélo-taf, POI, Moi) et barre d'actions en bas (Retour, Rétablir, Boucle, Pistes, GPX).
-- **Synchronisation téléphone ↔ PC** (onglet « Moi ») : maison, travail, vélo-taf, parcours sauvegardés et profil, chiffrés (AES-256) dans le navigateur puis déposés dans un **Gist secret** de ton GitHub (jeton avec la seule permission `gist` + phrase secrète). Les identifiants Strava ne sont jamais synchronisés.
+- **Synchronisation téléphone ↔ PC** (onglet « Moi ») : maison, travail, vélo-taf, parcours sauvegardés et profil, chiffrés (AES-256) dans le navigateur puis déposés dans un **Gist secret** de ton GitHub (jeton avec la seule permission `gist` + phrase secrète). Le Client ID / Secret de ton application Strava sont synchronisés (chiffrés) pour une connexion en un clic sur chaque appareil ; les jetons de connexion restent sur chaque appareil.
 - **Entraînement** (`training.html`) : FTP, courbe de puissance, forme/fatigue, zones, côtes, conseils et plan de la semaine.
 
 ## Données et vie privée

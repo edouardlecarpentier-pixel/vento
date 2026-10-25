@@ -1,9 +1,9 @@
 /* Vento — synchronisation entre appareils (téléphone ↔ PC).
    Les données (maison, travail, vélo-taf, parcours sauvegardés, profil) sont chiffrées dans le navigateur
    (AES-256-GCM, clé dérivée de ta phrase secrète) puis stockées dans un Gist SECRET de ton compte GitHub.
-   Les identifiants et jetons Strava ne sont jamais synchronisés. */
+   Strava : seuls le Client ID / Secret de ton application sont synchronisés (chiffrés) ; les jetons de connexion restent sur chaque appareil. */
 const VSync = (() => {
-  const KEYS = ['vento.places', 'vento.commute', 'vento.routes', 'vento.profile', 'vento.rider'];
+  const KEYS = ['vento.places', 'vento.commute', 'vento.routes', 'vento.profile', 'vento.rider', 'vento.stravaApp'];
   const CFG = 'vento.sync.cfg', TS = 'vento.sync.ts', DESC = 'Vento sync (données chiffrées)', FILE = 'vento-sync.json';
   const ls = localStorage, rawSet = Storage.prototype.setItem, rawDel = Storage.prototype.removeItem;
   const jget = (k, d) => { try { return JSON.parse(ls.getItem(k)) ?? d; } catch { return d; } };
@@ -130,8 +130,10 @@ const VSync = (() => {
     a.href = url; a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
   }
   function initUI() {
-    const q = id => document.getElementById(id); if (!q('syncOn')) return;
-    const c = cfg(); if (c.token) { q('syncToken').placeholder = '••••••••  (enregistré sur cet appareil)'; q('syncPass').placeholder = '••••••••  (enregistrée)'; emit(c.last ? `Dernière synchronisation à ${new Date(c.last).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : 'Activée.'); }
+    const q = id => document.getElementById(id), c = cfg();
+    if (c.token) setTimeout(() => sync('load'), 1500);                       // synchronisation automatique à l'ouverture de n'importe quelle page
+    if (!q('syncOn')) return;
+    if (c.token) { q('syncToken').placeholder = '••••••••  (enregistré sur cet appareil)'; q('syncPass').placeholder = '••••••••  (enregistrée)'; emit(c.last ? `Dernière synchronisation à ${new Date(c.last).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}` : 'Activée.'); }
     q('syncOn').onclick = async () => {
       const cur = cfg(), token = q('syncToken').value.trim() || cur.token, pass = q('syncPass').value || cur.pass;
       if (!token || !pass) return emit('Colle ton jeton GitHub et choisis une phrase secrète.', true);
@@ -150,7 +152,6 @@ const VSync = (() => {
         emit('Sauvegarde restaurée — rechargement…'); setTimeout(() => location.reload(), 900);
       } catch (err) { emit('⚠ ' + err.message, true); }
     };
-    if (c.token) setTimeout(() => sync('load'), 1500);
   }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && cfg().token) sync('visible'); });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initUI); else initUI();
