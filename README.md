@@ -62,5 +62,5 @@ Les estimations (durée, vent, FTP, conseils) sont des repères : reste prudent 
 - **Export FIT Garmin** : séance guidée (cibles de puissance) à copier dans `Garmin/NewFiles` ou à importer dans Garmin Connect. Non testé sur un appareil réel.
 - **Boucle intelligente** (planificateur) : 4 boucles testées, dénivelé mesuré, choix selon ta forme du jour et départ vent de face.
 - **Meilleur créneau** : pénalise pluie, froid/chaleur et rafales, pas seulement le vent.
-- **Secours** : MET Norway pour le vent, OpenTopoData pour l'altitude si Open-Meteo est indisponible.
+- **Secours** : MET Norway pour le vent, altitude fournie par BRouter (aucun quota), puis Open-Elevation si besoin.
 - **Sauvegarde** : fichier JSON complet (sans identifiants Strava) + rappel ; bilans et FTP aussi synchronisés par le Gist chiffré.

@@ -777,7 +777,17 @@ async function routeBRouter(pts, profile) {
   const j = await fetchJSON(`https://brouter.de/brouter?lonlats=${lonlats}&profile=${profile}&alternativeidx=0&format=geojson`, {}, 45000);
   const c = j.features?.[0]?.geometry?.coordinates;
   if (!c || c.length < 2) throw new Error('itinéraire vide');
-  return { coords: c.map(p => [p[1], p[0]]), msgs: j.features[0].properties?.messages || null };   // msgs = nature de chaque tronçon (OSM)
+  const ele = c.every(p => Number.isFinite(p[2])) ? c.map(p => p[2]) : null;                    // BRouter fournit l'altitude (SRTM) de chaque point : aucun appel supplémentaire
+  return { coords: c.map(p => [p[1], p[0]]), ele, msgs: j.features[0].properties?.messages || null };   // msgs = nature de chaque tronçon (OSM)
+}
+function eleFromRaw(rt) {                                    // altitude du tracé BRouter rééchantillonnée comme le profil
+  const e = rt.rawEle, cum = rt.cum, out = []; let j = 0;
+  for (const d of rt.rs.cum) {
+    while (j < cum.length - 2 && cum[j + 1] < d) j++;
+    const seg = cum[j + 1] - cum[j], f = seg > 0 ? clamp((d - cum[j]) / seg, 0, 1) : 0;
+    out.push(e[j] + (e[j + 1] - e[j]) * f);
+  }
+  return out;
 }
 async function routeOSRM(pts, foot = false) {
   const s = pts.map(w => `${w.lng.toFixed(6)},${w.lat.toFixed(6)}`).join(';');
@@ -840,18 +850,17 @@ async function fetchElevationOM(pts) {
   await Promise.all(jobs);
   return out;
 }
-async function fetchElevationTopo(pts) {                                   // secours : OpenTopoData (SRTM 90 m), 100 points / requête, 1 requête par seconde
+async function fetchElevationTopo(pts) {                                   // secours : Open-Elevation (SRTM 90 m, accepte les appels depuis un site web), 100 points / requête
   const out = new Array(pts.length);
   for (let i = 0; i < pts.length; i += 100) {
-    if (i) await new Promise(r => setTimeout(r, 1100));
-    const sl = pts.slice(i, i + 100), j = await fetchJSON('https://api.opentopodata.org/v1/srtm90m?locations=' + sl.map(p => p[0].toFixed(5) + ',' + p[1].toFixed(5)).join('|'), {}, 20000);
+    const sl = pts.slice(i, i + 100), j = await fetchJSON('https://api.open-elevation.com/api/v1/lookup?locations=' + sl.map(p => p[0].toFixed(5) + ',' + p[1].toFixed(5)).join('|'), {}, 30000);
     j.results.forEach((r, k) => out[i + k] = r.elevation);
   }
   return out;
 }
 async function fetchElevation(pts) {
   try { return await fetchElevationOM(pts); }
-  catch (e) { console.warn('altitude Open-Meteo indisponible, secours OpenTopoData', e); return await fetchElevationTopo(pts); }
+  catch (e) { console.warn('altitude Open-Meteo indisponible, secours Open-Elevation', e); return await fetchElevationTopo(pts); }
 }
 function pointAt(rt, d) { return rt.rs.pts[clamp(Math.round(d / rt.rs.step), 0, rt.rs.n - 1)]; }
 async function fetchWindMet(rt) {                                         // secours : MET Norway (locationforecast), un appel par point, converti au format Open-Meteo
@@ -992,7 +1001,8 @@ async function recompute() {
   state.ana = null; state.anaRev = null; state.best = [];
   renderAll();                                           // tracé provisoire + distance
   setBusy('Altitude & vent…');
-  const [eleR, windR] = await Promise.allSettled([fetchElevation(rt.rs.pts), fetchWind(rt)]);
+  rt.rawEle = res.ele && res.ele.length === rt.raw.length ? res.ele : null;
+  const [eleR, windR] = await Promise.allSettled([rt.rawEle ? Promise.resolve(eleFromRaw(rt)) : fetchElevation(rt.rs.pts), fetchWind(rt)]);
   if (tok !== state.tok) return;
   let msg = '', err = false;
   if (eleR.status === 'fulfilled') { rt.rs.ele = smooth(eleR.value.map(v => v ?? 0), 2); rt.rs.hasEle = true; }
@@ -1570,6 +1580,7 @@ async function smartLoop() {
       try {
         const res = await getRoute([start, w1, w2, start].map(p => ({ lat: p.lat, lng: p.lng })), profile), rt = buildRoute(res.coords);
         if (rt.total < km * 1000 * .55 || rt.total > km * 1000 * 1.6) continue;
+        rt.rawEle = res.ele && res.ele.length === rt.raw.length ? res.ele : null;
         c.w = [w1, w2]; c.rt = rt; ok.push(c);
       } catch (e) { console.warn('boucle', e); }
     }
@@ -1577,7 +1588,7 @@ async function smartLoop() {
     $('#smartInfo').textContent = 'Mesure du dénivelé…';
     await Promise.all(ok.map(async c => {
       const k = Math.max(1, Math.ceil(c.rt.rs.pts.length / 100)), pts = c.rt.rs.pts.filter((_, i) => i % k === 0);
-      try { const e = await fetchElevation(pts); let up = 0, ref = e[0]; for (const v of e) { const d = v - ref; if (Math.abs(d) >= 4) { if (d > 0) up += d; ref = v; } } c.gain = up; } catch { c.gain = null; }
+      try { const e = c.rt.rawEle ? eleFromRaw(c.rt).filter((_, i) => i % k === 0) : await fetchElevation(pts); let up = 0, ref = e[0]; for (const v of e) { const d = v - ref; if (Math.abs(d) >= 4) { if (d > 0) up += d; ref = v; } } c.gain = up; } catch { c.gain = null; }
     }));
     const target = { easy: 3, normal: 9, hard: 16 }[mode];
     for (const c of ok) { const gpk = c.gain == null ? target : c.gain / (c.rt.total / 1000); c.gpk = gpk; c.score = (mode === 'hard' ? Math.max(0, target - gpk) : Math.abs(gpk - target)) + Math.abs(c.rt.total / 1000 - km) / km * 25; }
