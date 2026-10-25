@@ -168,6 +168,15 @@ h3.ch small{color:var(--mut);font-weight:400}
       </div>
       <div class="bar" id="bar" hidden><i id="barI"></i></div>
       <div class="status" id="status"></div>
+      <div id="viBox" hidden style="margin-top:10px">
+        <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="viAuto" style="width:20px;height:20px"> Envoyer automatiquement mes sorties VeloIndoor vers Strava</label>
+        <div id="viPend" class="status"></div>
+        <div class="row nof" style="margin-top:6px">
+          <button class="btn primary" id="btnViSend" hidden>⬆ Envoyer sur Strava</button>
+          <button class="btn strava" id="btnViAuth" hidden>Autoriser l'envoi vers Strava</button>
+          <button class="btn" id="btnViTcx" hidden>⬇ Télécharger le TCX</button>
+        </div>
+      </div>
       <div class="pws">Données <b>Strava</b> — <a href="https://www.strava.com" target="_blank" rel="noopener">Powered by Strava</a>. Analyse locale dans ton navigateur : rien n'est envoyé ailleurs.</div>
     </section>
 
@@ -281,7 +290,7 @@ function setStatus(msg, err = false) { const s = $('#status'); s.textContent = m
 function setBar(p) { $('#bar').hidden = p == null; if (p != null) $('#barI').style.width = Math.round(p * 100) + '%'; }
 
 function authUrl(cid) {
-  const q = new URLSearchParams({ client_id: cid, response_type: 'code', redirect_uri: redirectUri(), approval_prompt: 'auto', scope: 'read,activity:read_all' });
+  const q = new URLSearchParams({ client_id: cid, response_type: 'code', redirect_uri: redirectUri(), approval_prompt: 'auto', scope: 'read,activity:read_all,activity:write' });
   return 'https://www.strava.com/oauth/authorize?' + q;
 }
 function connect() {
@@ -318,6 +327,7 @@ async function handleCallback() {
   history.replaceState({}, '', location.pathname);
   if (q.get('error')) { setStatus('Connexion refusée sur Strava.', true); return false; }
   if (!(q.get('scope') || '').includes('activity:read')) setStatus('Attention : l\'accès aux activités n\'a pas été autorisé (coche « Afficher les données de mes activités »).', true);
+  S.scope = q.get('scope') || '';
   try {
     setStatus('Connexion en cours…'); await tokenRequest({ grant_type: 'authorization_code', code: q.get('code') });
     setStatus('Connecté à Strava ✓'); return true;
@@ -338,12 +348,17 @@ async function syncActivities(batch = 25) {
     const ath = await api('/athlete'); S.athlete = { id: ath.id, firstname: ath.firstname, weight: ath.weight || null, ftp: ath.ftp || null }; saveS();
     const after = Math.floor((Date.now() - 400 * DAY) / 1000), list = [];
     for (let page = 1; page <= 4; page++) { const a = await api(`/athlete/activities?per_page=100&page=${page}&after=${after}`); list.push(...a); if (a.length < 100) break; }
-    const old = new Map(rides.map(r => [r.id, r]));
+    const old = new Map(rides.map(r => [r.id, r])), vis = rides.filter(r => r.src === 'veloindoor');
     rides = list.filter(a => RIDE_TYPES.has(a.sport_type || a.type)).map(a => ({
       ...(old.get(a.id) || {}), id: a.id, name: a.name, date: Date.parse(a.start_date), type: a.sport_type || a.type, dist: a.distance, time: a.moving_time,
       gain: a.total_elevation_gain, avgW: a.average_watts || 0, npW: a.weighted_average_watts || 0, devW: !!a.device_watts, avgHR: a.average_heartrate || 0,
       maxHR: a.max_heartrate || 0, kj: a.kilojoules || 0, avgV: a.average_speed
     })).sort((x, y) => y.date - x.date);
+    for (const v of vis) {                                            // sortie VeloIndoor : remplacée par son équivalent Strava (même heure) une fois synchronisé
+      const twin = rides.find(a => Math.abs(a.date - v.date) < 15 * 60 * 1000);
+      if (twin) { if (twin.d === undefined && v.d !== undefined) twin.d = v.d; } else rides.push(v);
+    }
+    rides.sort((x, y) => y.date - x.date);
     isDemo = false; store.set('vento.demo', false); persistRides();
     setStatus(`${rides.length} sorties à vélo trouvées. Analyse détaillée des plus récentes…`);
     await detailBatch(batch); store.set(LAST_SYNC, Date.now());
@@ -370,6 +385,103 @@ async function detailBatch(n) {
   setStatus(`${rides.filter(r => r.d).length} sorties analysées ✓${left ? ` — ${left} de plus disponibles (bouton « Analyser plus »)` : ''}`);
 }
 function persistRides() { if (!store.set('vento.rides', rides)) setStatus('Stockage du navigateur plein : certaines données n\'ont pas pu être enregistrées.', true); }
+
+/* =====================================================================
+   Sorties VeloIndoor : réception (#ride=… gzip+base64url) → analyse → envoi automatique vers Strava
+   échantillon = [t(s), puissance, cadence, vitesse km/h, fc]
+   ===================================================================== */
+const PENDING = 'vento.pendingUp', AUTO_STRAVA = 'vento.autoStrava';
+const hasWrite = () => /activity:write/.test(S.scope || '');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function gunzipB64(s) {
+  const bin = atob(s.replace(/-/g, '+').replace(/_/g, '/')), u = Uint8Array.from(bin, c => c.charCodeAt(0));
+  const ds = new DecompressionStream('gzip'), w = ds.writable.getWriter(); w.write(u); w.close();
+  return JSON.parse(await new Response(ds.readable).text());
+}
+function indoorStreams(smp) {
+  const t0 = smp[0][0], time = [], watts = [], heartrate = [], velocity_smooth = [], distance = [];
+  let dist = 0, pt = null;
+  for (const x of smp) {
+    const t = x[0] - t0; if (pt != null) dist += ((x[3] || 0) / 3.6) * Math.max(1, t - pt); pt = t;
+    time.push(t); watts.push(x[1] || 0); heartrate.push(x[4] || 0); velocity_smooth.push((x[3] || 0) / 3.6); distance.push(dist);
+  }
+  return { time: { data: time }, watts: { data: watts }, heartrate: { data: heartrate }, velocity_smooth: { data: velocity_smooth }, distance: { data: distance } };
+}
+function rideFromIndoor(p) {
+  const smp = p.samples, st = indoorStreams(smp), n = smp.length, last = x => x[x.length - 1];
+  const d = summarize(st) || null, dist = last(st.distance.data), dur = last(st.time.data) + 1;
+  const W = st.watts.data, H = st.heartrate.data.filter(v => v > 0);
+  let kj = 0; for (let i = 0; i < n; i++) kj += W[i] * (i ? st.time.data[i] - st.time.data[i - 1] : 1);
+  return {
+    id: 'vi-' + p.start, name: p.name || 'VeloIndoor', date: p.start, type: 'VirtualRide', dist, time: d ? d.movT : dur, gain: p.gain || 0,
+    avgW: Math.round(W.reduce((a, b) => a + b, 0) / n), npW: d ? d.np : 0, devW: true, avgHR: H.length ? Math.round(H.reduce((a, b) => a + b, 0) / H.length) : 0,
+    maxHR: H.length ? Math.max(...H) : 0, kj: Math.round(kj / 1000), avgV: dist / dur, d, src: 'veloindoor', up: 'pending'
+  };
+}
+function tcxOf(p) {
+  const iso = ms => new Date(ms).toISOString(), st = indoorStreams(p.samples), dist = st.distance.data, dur = st.time.data[st.time.data.length - 1] + 1;
+  const pts = p.samples.map((x, i) => '<Trackpoint><Time>' + iso(p.start + x[0] * 1000) + '</Time><DistanceMeters>' + dist[i].toFixed(1) + '</DistanceMeters>' +
+    (x[4] ? '<HeartRateBpm><Value>' + x[4] + '</Value></HeartRateBpm>' : '') + (x[2] != null ? '<Cadence>' + Math.round(x[2]) + '</Cadence>' : '') +
+    '<Extensions><ns3:TPX><ns3:Watts>' + (x[1] || 0) + '</ns3:Watts></ns3:TPX></Extensions></Trackpoint>').join('');
+  return '<?xml version="1.0" encoding="UTF-8"?>\n<TrainingCenterDatabase xmlns="http://www.garmin.com/xmlschemas/TrainingCenterDatabase/v2" xmlns:ns3="http://www.garmin.com/xmlschemas/ActivityExtension/v2"><Activities><Activity Sport="Biking"><Id>' + iso(p.start) + '</Id><Lap StartTime="' + iso(p.start) +
+    '"><TotalTimeSeconds>' + dur + '</TotalTimeSeconds><DistanceMeters>' + dist[dist.length - 1].toFixed(1) + '</DistanceMeters><Calories>0</Calories><Intensity>Active</Intensity><TriggerMethod>Manual</TriggerMethod><Track>' + pts + '</Track></Lap></Activity></Activities></TrainingCenterDatabase>';
+}
+async function uploadToStrava(p) {
+  if (!S.refresh) throw Object.assign(new Error('Pas connecté à Strava.'), { noauth: true });
+  if (!hasWrite()) throw Object.assign(new Error('Autorisation d\'envoi manquante.'), { noauth: true });
+  const fd = new FormData();
+  fd.append('file', new Blob([tcxOf(p)], { type: 'application/xml' }), 'veloindoor.tcx');
+  fd.append('data_type', 'tcx'); fd.append('name', p.name || 'VeloIndoor'); fd.append('sport_type', 'VirtualRide'); fd.append('trainer', '1');
+  fd.append('description', 'Séance VeloIndoor (home trainer) envoyée via Vento'); fd.append('external_id', 'veloindoor-' + p.start);
+  const r = await fetch('https://www.strava.com/api/v3/uploads', { method: 'POST', headers: { Authorization: 'Bearer ' + await accessToken() }, body: fd });
+  if (r.status === 401 || r.status === 403) throw Object.assign(new Error('Strava refuse l\'envoi : autorisation manquante.'), { noauth: true });
+  if (r.status === 429) throw new Error('Limite Strava atteinte, réessaie dans un moment.');
+  let u = await r.json().catch(() => ({}));
+  if (!r.ok && !/duplicate/i.test(JSON.stringify(u))) throw new Error('Strava a refusé le fichier (' + r.status + ') ' + (u.error || ''));
+  for (let i = 0; i < 15 && !u.activity_id && !u.error && u.id; i++) { await sleep(2000); u = await api('/uploads/' + u.id); }
+  if (u.error && !/duplicate/i.test(u.error)) throw new Error('Strava : ' + u.error);
+  return u.activity_id || null;
+}
+async function flushPending(manual) {
+  const q = store.get(PENDING, []); if (!q.length) return viBox();
+  if (!manual && store.get(AUTO_STRAVA, true) === false) return viBox();
+  const rest = [];
+  for (const p of q) {
+    try {
+      setStatus('Envoi de « ' + p.name + ' » vers Strava…');
+      const id = await uploadToStrava(p), rec = rides.find(r => r.id === 'vi-' + p.start);
+      if (rec) { rec.up = 'done'; rec.stravaId = id; } persistRides(); setStatus('« ' + p.name + ' » envoyée sur Strava ✓');
+    } catch (e) {
+      rest.push(p);
+      setStatus(e.noauth ? e.message + ' Utilise le bouton « Autoriser l\'envoi vers Strava » (une seule fois).' : e.message + (e instanceof TypeError ? ' (envoi bloqué par le navigateur : télécharge le TCX et importe-le sur strava.com/upload/select)' : ''), true);
+    }
+  }
+  store.set(PENDING, rest); viBox();
+}
+function viBox() {
+  const q = store.get(PENDING, []), box = $('#viBox'); if (!box) return;
+  box.hidden = !q.length && !(S.refresh && !hasWrite());
+  $('#viAuto').checked = store.get(AUTO_STRAVA, true) !== false;
+  $('#viPend').textContent = q.length ? q.length + ' sortie(s) VeloIndoor en attente d\'envoi vers Strava.' : '';
+  $('#btnViSend').hidden = !q.length || !S.refresh || !hasWrite();
+  $('#btnViAuth').hidden = !S.refresh || hasWrite();
+  $('#btnViTcx').hidden = !q.length;
+}
+async function importFromHash() {
+  const m = /^#ride=([\w-]+)/.exec(location.hash); if (!m) return false;
+  history.replaceState({}, '', location.pathname + location.search);
+  try {
+    setStatus('Import de ta sortie VeloIndoor…');
+    const p = await gunzipB64(m[1]);
+    if (p.kind !== 'ride' || !p.samples || p.samples.length < 60) throw new Error('Sortie VeloIndoor vide ou illisible.');
+    if (rides.some(r => r.id === 'vi-' + p.start)) { setStatus('Cette sortie est déjà dans Vento ✓'); return true; }
+    if (isDemo) { rides = []; isDemo = false; store.set('vento.demo', false); Rider.clear(); }
+    const rec = rideFromIndoor(p); rides.unshift(rec); rides.sort((a, b) => b.date - a.date); persistRides();
+    store.set(PENDING, [...store.get(PENDING, []), p]);
+    setStatus('Sortie VeloIndoor importée ✓ (' + Math.round(rec.time / 60) + ' min, ' + rec.avgW + ' W moy.)');
+    return true;
+  } catch (e) { setStatus('Import VeloIndoor impossible : ' + e.message, true); return false; }
+}
 
 /* =====================================================================
    Analyse d'une sortie à partir de ses flux (1 échantillon ≈ 1 s)
@@ -859,8 +971,18 @@ $('.cbDomain').textContent = location.hostname || 'localhost';
 $('.siteUrl').textContent = location.origin.startsWith('http') ? location.origin : 'http://localhost:8765';
 $('.pageUrl').textContent = location.origin.startsWith('http') ? location.origin + location.pathname : 'http://localhost:8765/training.html';
 
+$('#viAuto').onchange = e => { store.set(AUTO_STRAVA, e.target.checked); };
+$('#btnViSend').onclick = () => flushPending(true);
+$('#btnViAuth').onclick = connect;
+$('#btnViTcx').onclick = () => store.get(PENDING, []).forEach(p => {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([tcxOf(p)], { type: 'application/xml' }));
+  a.download = 'veloindoor-' + new Date(p.start).toISOString().slice(0, 16).replace(/[:T]/g, '-') + '.tcx'; a.click();
+});
 handleCallback().then(async fresh => {
-  refresh();
+  const imported = await importFromHash();
+  refresh(); viBox();
+  if (S.refresh && !isDemo) await flushPending(false);        // envoi automatique des sorties VeloIndoor vers Strava
+  if (imported && !fresh) return;                             // on vient de VeloIndoor : pas de resynchro lourde immédiate
   if (fresh) await syncActivities(25);                        // juste après la connexion : récupère tout de suite les sorties
   else if (S.refresh) autoSync();                             // déjà connecté : mise à jour silencieuse
   else if (S.cid && S.secret) setStatus('Identifiants Strava déjà enregistrés : clique simplement sur « Se connecter à Strava ».');

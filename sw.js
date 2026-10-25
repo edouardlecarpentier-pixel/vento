@@ -1,5 +1,5 @@
 // Service worker : met en cache la coquille de l'app (pas les API) et reçoit les fichiers GPX partagés depuis Android.
-const CACHE = 'vento-v12';
+const CACHE = 'vento-v13';
 const SHELL = ['./', './index.html', './training.html', './rider.js', './sync.js', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE && k !== 'vento-share').map(k => caches.delete(k)))).then(() => self.clients.claim())));
