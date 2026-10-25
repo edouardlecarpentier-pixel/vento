@@ -3,7 +3,7 @@
    (AES-256-GCM, clé dérivée de ta phrase secrète) puis stockées dans un Gist SECRET de ton compte GitHub.
    Strava : seuls le Client ID / Secret de ton application sont synchronisés (chiffrés) ; les jetons de connexion restent sur chaque appareil. */
 const VSync = (() => {
-  const KEYS = ['vento.places', 'vento.commute', 'vento.routes', 'vento.profile', 'vento.rider', 'vento.stravaApp'];
+  const KEYS = ['vento.places', 'vento.commute', 'vento.routes', 'vento.profile', 'vento.rider', 'vento.stravaApp', 'vento.bilans', 'vento.ftpHist', 'vento.planAdj', 'vento.lastTest'];
   const CFG = 'vento.sync.cfg', TS = 'vento.sync.ts', DESC = 'Vento sync (données chiffrées)', FILE = 'vento-sync.json';
   const ls = localStorage, rawSet = Storage.prototype.setItem, rawDel = Storage.prototype.removeItem;
   const jget = (k, d) => { try { return JSON.parse(ls.getItem(k)) ?? d; } catch { return d; } };

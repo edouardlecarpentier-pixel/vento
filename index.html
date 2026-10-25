@@ -89,6 +89,7 @@ select{color-scheme:dark}
 .hb{width:100%;border-radius:3px 3px 1px 1px;background:var(--c);opacity:.75;min-height:4px;transition:.15s}
 .hcol:hover .hb{opacity:1}
 .hcol.sel .hb{opacity:1;outline:2px solid #fff;outline-offset:1px}
+.hcol.star span{color:#fbbf24;font-weight:700}.hcol.star .hb{box-shadow:0 0 0 2px #fbbf24}
 .hcol span{font-family:var(--mono);font-size:9.5px;color:var(--mut)}
 .hcol em{font-style:normal;font-size:9px;line-height:1;height:9px}
 .hsep{flex:none;align-self:stretch;border-left:1px dashed var(--line);padding-left:3px;display:flex;align-items:flex-start;font-size:10px;color:var(--mut);writing-mode:vertical-rl;transform:rotate(180deg);text-transform:uppercase;letter-spacing:.06em}
@@ -370,6 +371,7 @@ input:focus,select:focus{border-color:var(--a,var(--acc))}
       </div>
       <div id="results"></div>
     </details>
+    <button class="btn" id="btnSmart" style="width:100%;margin:10px 0 0" title="Génère une boucle au départ de ton point de départ, adaptée à ta forme du jour et au vent">✨ Boucle intelligente (forme + vent)</button>
     <button class="btn" id="btnSnap" style="width:100%;margin:10px 0 0" hidden title="Pour une trace importée en ligne droite : la recale sur les routes et chemins du mode choisi">🧲 Recaler cette trace sur les routes</button>
     <div class="toolbar">
       <button class="btn" id="btnUndo" title="Revenir en arrière (Ctrl+Z) — autant de fois que tu veux">↶ Retour</button>
@@ -444,6 +446,7 @@ input:focus,select:focus{border-color:var(--a,var(--acc))}
   <section class="card">
     <h2><span><span class="ic">⏱️</span>Meilleur créneau</span> <span class="tag" id="bestTag"></span></h2>
     <div id="hours"></div>
+    <p class="hint" id="bestSum" style="color:var(--txt)"></p>
     <p class="hint" id="hoursHint">Chaque barre = un départ possible (5 h–21 h, 48 h à venir). Plus la barre est haute et bleue, plus le vent t'aide. Clique pour choisir l'heure.</p>
   </section>
 
@@ -569,6 +572,21 @@ input:focus,select:focus{border-color:var(--a,var(--acc))}
     <button class="btn primary" id="upoiSave">Enregistrer</button>
     <button class="btn" id="upoiDel">🗑 Supprimer ce point</button>
     <button class="btn" id="upoiCancel">Annuler</button>
+  </div>
+</div>
+
+<div id="smartModal" class="modal" hidden>
+  <div class="sheet" role="dialog" aria-labelledby="smartTitle">
+    <h3 id="smartTitle">✨ Boucle intelligente</h3>
+    <p class="mut" id="smartForm" style="font-size:13px"></p>
+    <label class="f">Distance visée (km)<input id="smartKm" type="number" min="10" max="200" step="5" inputmode="numeric"></label>
+    <label class="f">Difficulté
+      <select id="smartMode"><option value="auto">Selon ma forme du jour (recommandé)</option><option value="easy">Facile : peu de dénivelé</option><option value="normal">Normale</option><option value="hard">Costaud : plus de dénivelé</option></select>
+    </label>
+    <label style="display:flex;gap:8px;align-items:center;font-size:14px"><input type="checkbox" id="smartWind" checked style="width:20px;height:20px"> Vent de face à l'aller, dans le dos au retour</label>
+    <p class="mut" id="smartInfo" style="font-size:12.5px">Part du premier point posé sur la carte (ou de ta maison). Je teste 4 boucles, je mesure le dénivelé de chacune et je garde celle qui te convient.</p>
+    <button class="btn primary" id="smartGo">Générer la boucle</button>
+    <button class="btn" id="smartCancel">Annuler</button>
   </div>
 </div>
 
@@ -812,7 +830,7 @@ function locateWaypoints(rt, pts) {            // distance le long du tracé de 
   });
   return out;
 }
-async function fetchElevation(pts) {
+async function fetchElevationOM(pts) {
   const out = new Array(pts.length), jobs = [];
   for (let i = 0; i < pts.length; i += 100) {
     const sl = pts.slice(i, i + 100);
@@ -822,8 +840,43 @@ async function fetchElevation(pts) {
   await Promise.all(jobs);
   return out;
 }
+async function fetchElevationTopo(pts) {                                   // secours : OpenTopoData (SRTM 90 m), 100 points / requête, 1 requête par seconde
+  const out = new Array(pts.length);
+  for (let i = 0; i < pts.length; i += 100) {
+    if (i) await new Promise(r => setTimeout(r, 1100));
+    const sl = pts.slice(i, i + 100), j = await fetchJSON('https://api.opentopodata.org/v1/srtm90m?locations=' + sl.map(p => p[0].toFixed(5) + ',' + p[1].toFixed(5)).join('|'), {}, 20000);
+    j.results.forEach((r, k) => out[i + k] = r.elevation);
+  }
+  return out;
+}
+async function fetchElevation(pts) {
+  try { return await fetchElevationOM(pts); }
+  catch (e) { console.warn('altitude Open-Meteo indisponible, secours OpenTopoData', e); return await fetchElevationTopo(pts); }
+}
 function pointAt(rt, d) { return rt.rs.pts[clamp(Math.round(d / rt.rs.step), 0, rt.rs.n - 1)]; }
+async function fetchWindMet(rt) {                                         // secours : MET Norway (locationforecast), un appel par point, converti au format Open-Meteo
+  const K = clamp(Math.ceil(rt.total / 20000), 1, 8), locs = [];
+  for (let k = 0; k < K; k++) locs.push(pointAt(rt, (k + .5) * rt.total / K));
+  const res = await Promise.all(locs.map(p => fetchJSON(`https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${p[0].toFixed(3)}&lon=${p[1].toFixed(3)}`, {}, 25000)));
+  return {
+    K, src: 'MET Norway', locs: res.map(j => {
+      const ts = j.properties.timeseries, t0 = Math.floor(Date.parse(ts[0].time) / 3600e3) * 3600e3, n = Math.min(24 * 8, Math.floor((Date.parse(ts[ts.length - 1].time) - t0) / 3600e3) + 1);
+      const ws = [], wd = [], gust = [], temp = [], pop = []; let k = 0;
+      for (let h = 0; h < n; h++) {
+        const t = t0 + h * 3600e3; while (k < ts.length - 1 && Date.parse(ts[k + 1].time) <= t) k++;
+        const d = ts[k].data.instant.details, pr = ts[k].data.next_1_hours?.details?.precipitation_amount ?? ts[k].data.next_6_hours?.details?.precipitation_amount ?? 0;
+        ws.push((d.wind_speed ?? 0) * 3.6); wd.push(d.wind_from_direction ?? 0); gust.push((d.wind_speed_of_gust ?? d.wind_speed * 1.4 ?? 0) * 3.6); temp.push(d.air_temperature ?? 0);
+        pop.push(pr >= .5 ? 80 : pr > 0 ? 45 : 0);        // MET Norway donne des millimètres : converti en probabilité indicative
+      }
+      return { t0, ws, wd, gust, temp, pop };
+    })
+  };
+}
 async function fetchWind(rt) {
+  try { return await fetchWindOM(rt); }
+  catch (e) { console.warn('vent Open-Meteo indisponible, secours MET Norway', e); try { return await fetchWindMet(rt); } catch (e2) { console.warn(e2); throw e; } }
+}
+async function fetchWindOM(rt) {
   const K = clamp(Math.ceil(rt.total / 20000), 1, 8), locs = [];
   for (let k = 0; k < K; k++) locs.push(pointAt(rt, (k + .5) * rt.total / K));
   const url = 'https://api.open-meteo.com/v1/forecast?latitude=' + locs.map(p => p[0].toFixed(3)).join(',') +
@@ -950,6 +1003,10 @@ async function recompute() {
   reanalyze();
   schedulePOI(500);
 }
+function slotScore(a) {                                    // temps de parcours + pénalités confort (pluie, froid / chaleur, rafales) : plus bas = meilleur
+  const t = a.avgTemp, comfort = t < 8 ? (8 - t) * .012 : t > 26 ? (t - 26) * .015 : 0;
+  return a.sec * (1 + (a.popMax / 100) * .25 + comfort + Math.max(0, a.gustMax - 40) * .004);
+}
 function reanalyze() {
   const rt = state.route; if (!rt) { renderAll(); return; }
   computePower(rt);
@@ -960,7 +1017,7 @@ function reanalyze() {
     const t = new Date(); t.setMinutes(0, 0, 0); const t0 = t.getTime() + 3600e3;
     for (let h = 0; h < 48; h++) {
       const ts = t0 + h * 3600e3, hr = new Date(ts).getHours(); if (hr < 5 || hr > 21) continue;
-      const a = analyze(rt, ts, true); state.best.push({ ts, sec: a.sec, pop: a.popMax, ws: a.avgWs, head: a.avgHead });
+      const a = analyze(rt, ts, true); state.best.push({ ts, sec: a.sec, pop: a.popMax, ws: a.avgWs, head: a.avgHead, temp: a.avgTemp, gust: a.gustMax, score: slotScore(a) });
     }
   }
   renderAll();
@@ -1154,7 +1211,7 @@ function renderWind() {
     wc.innerHTML = `<p class="mut" style="margin:0">${ana ? 'Prévisions de vent indisponibles (vérifie ta connexion).' : 'Chargement des prévisions…'}</p>`;
     bar.innerHTML = lg.innerHTML = ''; vd.hidden = cmp.hidden = true; return;
   }
-  $('#windTag').textContent = ana.outOfRange ? '⚠ hors prévisions' : 'prévisions Open-Meteo';
+  $('#windTag').textContent = ana.outOfRange ? '⚠ hors prévisions' : 'prévisions ' + (state.wind?.src || 'Open-Meteo');
   wc.innerHTML = `${windRose(ana.avgWd)}<div>
     <div class="big">${Math.round(ana.avgWs)}<i>km/h</i> <span style="font-size:14px;color:var(--acc)">du ${cardinal(ana.avgWd)}</span></div>
     <p>rafales jusqu'à ${Math.round(ana.gustMax)} km/h · ${Math.round(ana.avgTemp)} °C · pluie max ${Math.round(ana.popMax)} %</p>
@@ -1177,17 +1234,20 @@ function renderHours() {
   if (!B.length) { el.innerHTML = '<p class="mut" style="margin:0;font-size:12.5px">Disponible dès qu\'un itinéraire et les prévisions sont chargés.</p>'; $('#bestTag').textContent = ''; return; }
   const secs = B.map(b => b.sec), mn = Math.min(...secs), mx = Math.max(...secs), span = Math.max(1, mx - mn);
   let lastDay = '', html = '';
+  const bestTs = B.reduce((a, b) => b.score < a.score ? b : a).ts;
   for (const b of B) {
     const d = new Date(b.ts), day = d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
     if (day !== lastDay) { html += `<div class="hsep">${esc(day)}</div>`; lastDay = day; }
     const q = 1 - (b.sec - mn) / span, hgt = 18 + q * 62;
-    const tip = `${d.toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} · ${fmtDur(b.sec)} · vent ${Math.round(b.ws)} km/h (${b.head >= 0 ? '+' : '−'}${Math.abs(b.head).toFixed(1)}) · pluie ${Math.round(b.pop)} %`;
-    html += `<button class="hcol${b.ts === state.startMs ? ' sel' : ''}" data-ts="${b.ts}" title="${esc(tip)}"><em>${b.pop >= 50 ? '💧' : ''}</em><div class="hb" style="height:${hgt}%;--c:color-mix(in oklab,#38bdf8 ${Math.round(q * 100)}%,#ef4444)"></div><span>${d.getHours()}</span></button>`;
+    const tip = `${d.toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit' })} · ${fmtDur(b.sec)} · vent ${Math.round(b.ws)} km/h (${b.head >= 0 ? '+' : '−'}${Math.abs(b.head).toFixed(1)}) · ${Math.round(b.temp)} °C · pluie ${Math.round(b.pop)} %`;
+    html += `<button class="hcol${b.ts === state.startMs ? ' sel' : ''}${b.ts === bestTs ? ' star' : ''}" data-ts="${b.ts}" title="${esc(tip)}"><em>${b.pop >= 50 ? '💧' : ''}</em><div class="hb" style="height:${hgt}%;--c:color-mix(in oklab,#38bdf8 ${Math.round(q * 100)}%,#ef4444)"></div><span>${d.getHours()}</span></button>`;
   }
   el.innerHTML = html;
   el.querySelectorAll('.hcol').forEach(b => b.onclick = () => { state.startMs = +b.dataset.ts; reanalyze(); });
-  const best = B.reduce((a, b) => b.sec < a.sec ? b : a), cur = state.ana;
-  $('#bestTag').textContent = `${new Date(best.ts).toLocaleString('fr-FR', { weekday: 'short', hour: '2-digit', minute: '2-digit' })} · ${fmtDur(best.sec)}${cur ? ' (' + fmtDelta(best.sec - cur.sec) + ')' : ''}`;
+  const best = B.reduce((a, b) => b.score < a.score ? b : a), cur = state.ana;
+  $('#bestTag').textContent = `★ ${new Date(best.ts).toLocaleString('fr-FR', { weekday: 'short', hour: '2-digit', minute: '2-digit' })} · ${fmtDur(best.sec)}${cur ? ' (' + fmtDelta(best.sec - cur.sec) + ')' : ''}`;
+  $('#bestSum').innerHTML = `<b>★ Départ conseillé : ${new Date(best.ts).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit' })}</b> — ${Math.round(best.temp)} °C, pluie ${Math.round(best.pop)} %, vent ${Math.round(best.ws)} km/h (${best.head >= 0 ? 'de face' : 'dans le dos'} ${Math.abs(best.head).toFixed(0)}), rafales ${Math.round(best.gust)} km/h. <button class="btn sm" id="btnUseBest">Choisir ce créneau</button>`;
+  $('#btnUseBest').onclick = () => { state.startMs = best.ts; reanalyze(); };
   const sel = el.querySelector('.sel'); if (sel) sel.scrollIntoView({ block: 'nearest', inline: 'center' });
 }
 
@@ -1478,6 +1538,58 @@ $('#sendVI').onclick = async () => {              // parcours -> VeloIndoor (≤
   toast('Envoi à VeloIndoor… (parcours aussi copié : « Importer depuis Vento »)', 6000);
 };
 $('#sendShare').onclick = shareGpx;
+/* ---------- Boucle intelligente : forme du jour (training.html) + vent + dénivelé ---------- */
+const destPt = (p, brg, km) => { const R = 6371, d = km / R, b = rad(brg), la = rad(p.lat), lo = rad(p.lng), la2 = Math.asin(Math.sin(la) * Math.cos(d) + Math.cos(la) * Math.sin(d) * Math.cos(b)); return { lat: deg(la2), lng: deg(lo + Math.atan2(Math.sin(b) * Math.sin(d) * Math.cos(la), Math.cos(d) - Math.sin(la) * Math.sin(la2))) }; };
+function formInfo() {
+  const f = Rider.load()?.form; if (!f || Math.floor(Date.now() / 864e5) - f.day > 14) return null;
+  const mode = f.tsb < -15 ? 'easy' : f.tsb > 8 ? 'hard' : 'normal', km = f.ctl < 25 ? 25 : f.ctl < 45 ? 40 : f.ctl < 65 ? 60 : 80;
+  return { ...f, mode, km, label: f.tsb < -15 ? 'fatigué' : f.tsb > 8 ? 'frais' : 'en forme normale' };
+}
+function openSmart() {
+  const fi = formInfo(); $('#smartKm').value = $('#smartKm').value || (fi ? fi.km : 40);
+  $('#smartForm').textContent = fi ? `Ta forme du jour : ${fi.label} (fraîcheur ${fi.tsb > 0 ? '+' : ''}${fi.tsb}, forme ${fi.ctl}). Boucle conseillée : ${fi.km} km.` : 'Ouvre une fois la page Entraînement (avec Strava) pour que je connaisse ta forme du jour ; sans elle, la difficulté « normale » est utilisée.';
+  $('#smartModal').hidden = false;
+}
+async function smartLoop() {
+  const km = clamp(+$('#smartKm').value || 40, 10, 200), fi = formInfo(); let mode = $('#smartMode').value; if (mode === 'auto') mode = fi ? fi.mode : 'normal';
+  const start = state.wps[0] || state.places.home || (() => { const c = map.getCenter(); return { lat: c.lat, lng: c.lng }; })(), go = $('#smartGo');
+  go.disabled = true; $('#smartInfo').textContent = 'Lecture du vent…';
+  try {
+    let base = 0, windTxt = '';
+    if ($('#smartWind').checked) {
+      try {
+        const fake = { total: 1, rs: { pts: [[start.lat, start.lng]], step: 1, n: 1 } }, W = await fetchWind(fake), L = W.locs[0], i = clamp(Math.round((state.startMs - L.t0) / 3600e3), 0, L.ws.length - 1);
+        if (L.ws[i] >= 6) { base = L.wd[i]; windTxt = ` · départ vent de face (${Math.round(L.ws[i])} km/h du ${cardinal(L.wd[i])})`; }
+      } catch (e) { console.warn(e); }
+    }
+    const r = km / 4.1, offs = [-35, 35], cands = (base || windTxt ? [0, 60, -60, 120] : [0, 90, 180, 270]).map(b => ({ b: (base + b + 360) % 360 }));
+    $('#smartInfo').textContent = 'Tracé de 4 boucles…';
+    const profile = state.set.routing, ok = [];
+    for (const c of cands) {                                       // séquentiel : ménage les serveurs de routage publics
+      const w1 = destPt(start, c.b + offs[0], r), w2 = destPt(start, c.b + offs[1], r);
+      try {
+        const res = await getRoute([start, w1, w2, start].map(p => ({ lat: p.lat, lng: p.lng })), profile), rt = buildRoute(res.coords);
+        if (rt.total < km * 1000 * .55 || rt.total > km * 1000 * 1.6) continue;
+        c.w = [w1, w2]; c.rt = rt; ok.push(c);
+      } catch (e) { console.warn('boucle', e); }
+    }
+    if (!ok.length) throw new Error('Aucune boucle n\'a pu être tracée (routage indisponible). Réessaie dans un instant.');
+    $('#smartInfo').textContent = 'Mesure du dénivelé…';
+    await Promise.all(ok.map(async c => {
+      const k = Math.max(1, Math.ceil(c.rt.rs.pts.length / 100)), pts = c.rt.rs.pts.filter((_, i) => i % k === 0);
+      try { const e = await fetchElevation(pts); let up = 0, ref = e[0]; for (const v of e) { const d = v - ref; if (Math.abs(d) >= 4) { if (d > 0) up += d; ref = v; } } c.gain = up; } catch { c.gain = null; }
+    }));
+    const target = { easy: 3, normal: 9, hard: 16 }[mode];
+    for (const c of ok) { const gpk = c.gain == null ? target : c.gain / (c.rt.total / 1000); c.gpk = gpk; c.score = (mode === 'hard' ? Math.max(0, target - gpk) : Math.abs(gpk - target)) + Math.abs(c.rt.total / 1000 - km) / km * 25; }
+    const best = ok.reduce((a, c) => c.score < a.score ? c : a);
+    pushHistory(); state.wps = [{ lat: start.lat, lng: start.lng }, ...best.w]; state.loop = true; state.hasEnd = true;
+    scheduleRecompute(0); $('#smartModal').hidden = true;
+    toast(`Boucle de ${(best.rt.total / 1000).toFixed(0)} km${best.gain != null ? ` · ≈ +${Math.round(best.gain)} m` : ''} — difficulté ${{ easy: 'facile', normal: 'normale', hard: 'costaud' }[mode]}${windTxt}`, 7000);
+  } catch (e) { $('#smartInfo').textContent = e.message; }
+  go.disabled = false;
+}
+$('#btnSmart').onclick = openSmart; $('#smartGo').onclick = smartLoop; $('#smartCancel').onclick = () => { $('#smartModal').hidden = true; };
+$('#smartModal').addEventListener('click', e => { if (e.target.id === 'smartModal') $('#smartModal').hidden = true; });
 $('#sendClose').onclick = () => { $('#sendModal').hidden = true; };
 $('#sendModal').addEventListener('click', e => { if (e.target.id === 'sendModal') $('#sendModal').hidden = true; });
 function importGPX(text) {

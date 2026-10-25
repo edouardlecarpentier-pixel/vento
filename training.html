@@ -189,6 +189,11 @@ h3.ch small{color:var(--mut);font-weight:400}
         <label class="f">Poids (kg)<input id="ovW" type="number" min="35" max="200" step=".5"></label>
         <label class="f">FC max (bpm)<input id="ovHr" type="number" min="120" max="230" step="1"></label>
       </div>
+      <div class="row nof" style="margin-top:10px">
+        <button class="btn" id="btnBk" title="Fichier JSON avec tes sorties analysées, bilans, FTP, lieux et parcours (sans tes identifiants Strava)">💾 Sauvegarder mes données</button>
+        <label class="btn" style="cursor:pointer">📂 Restaurer<input type="file" id="bkFile" accept=".json,application/json" hidden></label>
+      </div>
+      <div class="status" id="bkNote"></div>
       <p class="mut" style="font-size:12px;margin:8px 0 0">Ce profil est utilisé automatiquement par le <a href="index.html">planificateur</a> pour estimer ton temps (puissance, côtes, calibrage).</p>
     </section>
 
@@ -1118,6 +1123,28 @@ $('.cbDomain').textContent = location.hostname || 'localhost';
 $('.siteUrl').textContent = location.origin.startsWith('http') ? location.origin : 'http://localhost:8765';
 $('.pageUrl').textContent = location.origin.startsWith('http') ? location.origin + location.pathname : 'http://localhost:8765/training.html';
 
+/* Sauvegarde complète (hors identifiants Strava et jeton de synchro, qui restent sur l'appareil) */
+const BK_SKIP = new Set(['vento.stravaApp', 'vento.strava', 'vento.sync.cfg', 'vento.sync.ts', 'vento.windcache', 'vento.demo']);
+const bkKeys = () => Object.keys(localStorage).filter(k => k.startsWith('vento.') && !BK_SKIP.has(k));
+function bkNote() {
+  const t = store.get('vento.lastBackup', 0), age = t ? Math.floor((Date.now() - t) / DAY) : null;
+  $('#bkNote').textContent = !rides.length || isDemo ? '' : age == null ? 'Pense à sauvegarder : tes sorties analysées ne sont que dans ce navigateur.' : age > 14 ? `Dernière sauvegarde il y a ${age} jours : pense à en refaire une.` : `Dernière sauvegarde il y a ${age} jour(s).`;
+  $('#bkNote').classList.toggle('err', age == null || age > 14);
+}
+$('#btnBk').onclick = () => {
+  const o = {}; bkKeys().forEach(k => { o[k] = localStorage.getItem(k); });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify({ app: 'vento', v: 2, date: new Date().toISOString(), data: o })], { type: 'application/json' }));
+  a.download = 'vento-sauvegarde-' + new Date().toISOString().slice(0, 10) + '.json'; a.click(); store.set('vento.lastBackup', Date.now()); bkNote();
+};
+$('#bkFile').onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  try {
+    const j = JSON.parse(await f.text()); if (j.app !== 'vento' || !j.data) throw new Error('fichier inconnu');
+    let n = 0; for (const [k, v] of Object.entries(j.data)) if (k.startsWith('vento.') && !BK_SKIP.has(k) && typeof v === 'string') { localStorage.setItem(k, v); n++; }
+    rides = store.get('vento.rides', []); ov = store.get('vento.profile', {}); isDemo = false; setStatus(`Sauvegarde restaurée (${n} éléments).`); refresh(); bkNote();
+  } catch (err) { setStatus('Restauration impossible : ' + err.message, true); }
+  e.target.value = '';
+};
 $('#viAuto').onchange = e => { store.set(AUTO_STRAVA, e.target.checked); };
 $('#btnViSend').onclick = () => flushPending(true);
 $('#btnViAuth').onclick = connect;
@@ -1127,8 +1154,8 @@ $('#btnViTcx').onclick = () => store.get(PENDING, []).forEach(p => {
 });
 handleCallback().then(async fresh => {
   const imported = await importFromHash();
-  refresh(); viBox();
-  if (S.refresh && !isDemo) await flushPending(false);        // envoi automatique des sorties VeloIndoor vers Strava
+  refresh(); viBox(); bkNote();
+  if (S.refresh && !isDemo) await flushPending(false);       // envoi automatique des sorties VeloIndoor vers Strava
   if (imported && !fresh) return;                             // on vient de VeloIndoor : pas de resynchro lourde immédiate
   if (fresh) await syncActivities(25);                        // juste après la connexion : récupère tout de suite les sorties
   else if (S.refresh) autoSync();                             // déjà connecté : mise à jour silencieuse

@@ -53,3 +53,14 @@ puis ouvre <http://localhost:8765/>.
 Dépôt public → **Settings → Pages → Deploy from a branch → `main` / `(root)`**. Chaque `git push` met le site à jour en une minute environ.
 
 Les estimations (durée, vent, FTP, conseils) sont des repères : reste prudent sur la route.
+
+## Coach (page Entraînement) et planificateur
+- **Séance du jour** : choisie selon ta fraîcheur, la veille, la dernière séance intense et la dernière sortie longue ; boutons VeloIndoor, Garmin (.fit), ROUVY, ZWO, MRC.
+- **Suivi du FTP** : suggestion quand un nouveau meilleur 20 min dépasse ton FTP saisi, historique du FTP automatique.
+- **Bilan prévu / réalisé** : après une séance envoyée à VeloIndoor, Vento compare watts tenus et cibles et ajuste de ±2–3 % les prochaines séances.
+- **Progression** : meilleurs efforts 1/5/20/60 min sur 30 jours et FTP estimé par mois.
+- **Export FIT Garmin** : séance guidée (cibles de puissance) à copier dans `Garmin/NewFiles` ou à importer dans Garmin Connect. Non testé sur un appareil réel.
+- **Boucle intelligente** (planificateur) : 4 boucles testées, dénivelé mesuré, choix selon ta forme du jour et départ vent de face.
+- **Meilleur créneau** : pénalise pluie, froid/chaleur et rafales, pas seulement le vent.
+- **Secours** : MET Norway pour le vent, OpenTopoData pour l'altitude si Open-Meteo est indisponible.
+- **Sauvegarde** : fichier JSON complet (sans identifiants Strava) + rappel ; bilans et FTP aussi synchronisés par le Gist chiffré.
