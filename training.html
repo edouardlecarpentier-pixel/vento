@@ -97,10 +97,10 @@ td.n,th.n{text-align:right;font-family:var(--mono)}
         <details>
           <summary>Première connexion : créer ton application Strava (2 minutes)</summary>
           <ol>
-            <li>Ouvre <a href="https://www.strava.com/settings/api" target="_blank" rel="noopener">strava.com/settings/api</a> et crée une application (nom : <code>Vento</code>, catégorie : <code>Training</code>, site web : <code>http://localhost:8765</code>).</li>
-            <li>Dans <b>Authorization Callback Domain</b> écris : <code>localhost</code></li>
-            <li>Copie le <b>Client ID</b> et le <b>Client Secret</b>, colle-les ci-dessous (ils restent dans ton navigateur).</li>
-            <li>Ouvre cette page via <code>http://localhost:8765/training.html</code> (lance <code>serve.ps1</code>) puis clique « Se connecter à Strava ».</li>
+            <li>Ouvre <a href="https://www.strava.com/settings/api" target="_blank" rel="noopener">strava.com/settings/api</a> et crée une application (nom : <code>Vento</code>, catégorie : <code>Training</code>, site web : <code class="siteUrl">http://localhost:8765</code>).</li>
+            <li>Dans <b>Authorization Callback Domain</b> écris exactement : <code class="cbDomain">localhost</code> (sans <code>https://</code>, sans <code>/</code>).</li>
+            <li>Copie le <b>Client ID</b> (un <b>nombre</b>, par exemple <code>123456</code>) et le <b>Client Secret</b> (40 caractères), colle-les ci-dessous : ils restent dans ton navigateur.</li>
+            <li>Ouvre cette page à l'adresse <code class="pageUrl">http://localhost:8765/training.html</code> puis clique « Se connecter à Strava ». Le domaine de rappel doit être celui de l'adresse de cette page.</li>
           </ol>
         </details>
         <div class="row">
@@ -203,17 +203,22 @@ const redirectUri = () => location.origin + location.pathname;
 function setStatus(msg, err = false) { const s = $('#status'); s.textContent = msg; s.classList.toggle('err', err); }
 function setBar(p) { $('#bar').hidden = p == null; if (p != null) $('#barI').style.width = Math.round(p * 100) + '%'; }
 
-function connect() {
-  const cid = $('#cid').value.trim(), sec = $('#csec').value.trim();
-  if (!cid || !sec) return setStatus('Renseigne le Client ID et le Client Secret (voir le pas à pas ci-dessus).', true);
-  if (!/^https?:$/.test(location.protocol)) return setStatus('Ouvre cette page via http://localhost:8765/training.html (lance serve.ps1) : Strava refuse les pages « file:// ».', true);
-  S = { ...S, cid, secret: sec }; store.set('vento.strava', S);
+function authUrl(cid) {
   const q = new URLSearchParams({ client_id: cid, response_type: 'code', redirect_uri: redirectUri(), approval_prompt: 'auto', scope: 'read,activity:read_all' });
-  location.href = 'https://www.strava.com/oauth/authorize?' + q;
+  return 'https://www.strava.com/oauth/authorize?' + q;
+}
+function connect() {
+  const cid = $('#cid').value.replace(/\s+/g, ''), sec = $('#csec').value.replace(/\s+/g, '');   // espaces/retours collés par erreur
+  if (!cid || !sec) return setStatus('Renseigne le Client ID et le Client Secret (voir le pas à pas ci-dessus).', true);
+  if (!/^\d{4,9}$/.test(cid)) return setStatus('Le Client ID doit être un nombre (par ex. 123456), tel qu\'affiché sur strava.com/settings/api. Ne colle pas le Client Secret ni un jeton ici.', true);
+  if (!/^[0-9a-f]{40}$/i.test(sec)) return setStatus('Le Client Secret doit faire 40 caractères (lettres a–f et chiffres). Copie-le en entier depuis strava.com/settings/api.', true);
+  if (!/^https?:$/.test(location.protocol)) return setStatus('Ouvre cette page via une adresse http(s) (le site GitHub, ou http://localhost:8765/training.html avec serve.ps1) : Strava refuse les pages « file:// ».', true);
+  S = { ...S, cid, secret: sec }; store.set('vento.strava', S);
+  location.href = authUrl(cid);
 }
 async function tokenRequest(body) {
   const r = await fetch('https://www.strava.com/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: S.cid, client_secret: S.secret, ...body }) });
-  if (!r.ok) throw new Error('Strava a refusé la connexion (' + r.status + ') — vérifie le Client ID / Secret et le domaine de rappel « localhost ».');
+  if (!r.ok) throw new Error('Strava a refusé la connexion (' + r.status + ') — vérifie le Client ID / Secret et que le domaine de rappel Strava est bien « ' + (location.hostname || 'localhost') + ' ».');
   const j = await r.json();
   S = { ...S, access: j.access_token, refresh: j.refresh_token, exp: j.expires_at, athlete: { ...(S.athlete || {}), ...(j.athlete ? { id: j.athlete.id, firstname: j.athlete.firstname } : {}) } };
   store.set('vento.strava', S);
@@ -548,7 +553,8 @@ function render() {
   const connected = !!S.refresh && !isDemo;
   $('#btnSync').hidden = !connected; $('#btnMore').hidden = !connected; $('#btnLogout').hidden = !connected; $('#btnConnect').textContent = connected ? 'Reconnecter Strava' : 'Se connecter à Strava';
   $('#connTag').textContent = connected ? `connecté${S.athlete?.firstname ? ' : ' + S.athlete.firstname : ''}` : '';
-  $('#connSetup').hidden = false; $('#cid').value = S.cid || ''; $('#csec').value = S.secret || '';
+  $('#connSetup').hidden = false;
+  for (const [id, v] of [['cid', S.cid], ['csec', S.secret]]) { const el = $('#' + id); if (!el.dataset.dirty) el.value = v || ''; }   // ne jamais écraser ce que tu es en train de taper
   const wkg = m.ftp ? (m.ftp / m.weight).toFixed(2) : '—';
   $('#tiles').innerHTML = [
     tile('FTP', m.ftp || '—', 'W', ov.ftp ? 'saisi à la main' : m.ftpAuto ? 'auto : 95 % du meilleur 20 min' : '', '#22d3ee'),
@@ -642,7 +648,12 @@ $('#btnDemo').onclick = () => { setStatus('Génération de la démo…'); setTim
 $('#btnLogout').onclick = () => { S = {}; store.del('vento.strava'); rides = []; store.del('vento.rides'); Rider.clear(); setStatus('Déconnecté — données locales effacées.'); refresh(); };
 $('#btnClearDemo').onclick = () => { rides = []; isDemo = false; store.del('vento.rides'); store.del('vento.demo'); Rider.clear(); setStatus('Démo effacée.'); refresh(); };
 [['ovFtp', 'ftp'], ['ovW', 'weight'], ['ovHr', 'hrmax']].forEach(([id, k]) => $('#' + id).onchange = e => { const v = parseFloat(e.target.value); if (v > 0) ov[k] = v; else delete ov[k]; store.set('vento.profile', ov); refresh(); });
-let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => M && refresh(), 150); });
+// redessine seulement les graphiques : le clavier du téléphone déclenche « resize » et ne doit pas réinitialiser les champs
+let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { if (M && !$('#cardLoad').hidden) { drawLoad(M); drawCurve(M); drawWeek(M); } }, 150); });
+['cid', 'csec'].forEach(id => $('#' + id).addEventListener('input', e => { e.target.dataset.dirty = '1'; }));
+$('.cbDomain').textContent = location.hostname || 'localhost';
+$('.siteUrl').textContent = location.origin.startsWith('http') ? location.origin : 'http://localhost:8765';
+$('.pageUrl').textContent = location.origin.startsWith('http') ? location.origin + location.pathname : 'http://localhost:8765/training.html';
 
 handleCallback().then(refresh);
 </script>
